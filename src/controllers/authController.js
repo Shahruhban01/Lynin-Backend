@@ -1,3 +1,5 @@
+const admin = require('firebase-admin');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { verifyFirebaseToken } = require('../config/firebase');
 const generateToken = require('../utils/generateToken');
@@ -7,73 +9,97 @@ const generateToken = require('../utils/generateToken');
 // @access  Public
 exports.verifyToken = async (req, res) => {
   try {
-    const { firebaseToken, fcmToken } = req.body;
+    // Accept both 'idToken' (owner app) and 'firebaseToken' (customer app)
+    const { idToken, firebaseToken, phone } = req.body;
+    const token = idToken || firebaseToken;
 
-    if (!firebaseToken) {
+    console.log('📥 Verify Token Request:');
+    console.log('  Phone:', phone);
+    console.log('  Token:', token ? `${token.substring(0, 20)}...` : 'undefined');
+
+    // Validate token
+    if (!token) {
+      console.error('❌ No token provided');
       return res.status(400).json({
         success: false,
         message: 'Firebase token is required',
       });
     }
 
-    // Verify Firebase ID token
-    const decodedToken = await verifyFirebaseToken(firebaseToken);
-    const { uid, phone_number } = decodedToken;
+    // Verify Firebase token
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(token);
+      console.log('✅ Firebase token verified for UID:', decodedToken.uid);
+    } catch (error) {
+      console.error('❌ Firebase verification failed:', error.message);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Firebase token',
+      });
+    }
 
-    if (!phone_number) {
+    const uid = decodedToken.uid;
+    // Use phone from request body OR from Firebase token
+    const userPhone = phone || decodedToken.phone_number;
+
+    console.log('📱 Using phone:', userPhone);
+
+    if (!userPhone) {
+      console.error('❌ No phone number available');
       return res.status(400).json({
         success: false,
-        message: 'Phone number not found in Firebase token',
+        message: 'Phone number is required',
       });
     }
 
-    // Check if user exists
+    // Find or create user
     let user = await User.findOne({ firebaseUid: uid });
 
-    if (user) {
-      // Update existing user
-      user.lastLogin = Date.now();
-      if (fcmToken) user.fcmToken = fcmToken;
-      await user.save();
-
-      console.log(`✅ User logged in: ${user.phone}`);
-    } else {
-      // Create new user
+    if (!user) {
+      console.log('📝 Creating new user...');
       user = await User.create({
-        phone: phone_number,
+        phone: userPhone,
         firebaseUid: uid,
-        fcmToken: fcmToken || null,
-        lastLogin: Date.now(),
       });
-
-      console.log(`✅ New user created: ${user.phone}`);
+      console.log('✅ New user created:', user._id);
+    } else {
+      console.log('✅ Existing user found:', user._id);
+      user.lastLogin = Date.now();
+      await user.save();
     }
 
-    // Generate JWT token
-    const token = generateToken(user._id);
+    // Generate JWT
+    const token_jwt = jwt.sign(
+      { userId: user._id, phone: user.phone },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    console.log('✅ JWT generated for user:', user._id);
 
     res.status(200).json({
       success: true,
       message: 'Authentication successful',
-      token,
+      token: token_jwt,
       user: {
-        id: user._id,
+        _id: user._id,
         phone: user.phone,
         name: user.name,
         email: user.email,
-        createdAt: user.createdAt,
-        lastLogin: user.lastLogin,
       },
     });
   } catch (error) {
-    console.error('❌ Token verification error:', error);
-    res.status(401).json({
+    console.error('❌ Verify token error:', error);
+    res.status(500).json({
       success: false,
-      message: 'Invalid or expired Firebase token',
+      message: 'Authentication failed',
       error: error.message,
     });
   }
 };
+
+
 
 // @desc    Update user profile
 // @route   PUT /api/auth/update-profile
@@ -143,6 +169,194 @@ exports.getMe = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get user profile',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get user profile with statistics
+// @route   GET /api/auth/profile
+// @access  Private
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('-firebaseUid -__v')
+      .populate('preferredSalons', 'name location');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        phone: user.phone,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage,
+        totalBookings: user.totalBookings,
+        preferredSalons: user.preferredSalons,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get profile',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update user profile (name, email, profileImage)
+// @route   PUT /api/auth/profile
+// @access  Private
+exports.updateUserProfile = async (req, res) => {
+  try {
+    const { name, email, profileImage } = req.body;
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Validate email format if provided
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email format',
+        });
+      }
+
+      // Check if email already exists for another user
+      const existingEmail = await User.findOne({ 
+        email, 
+        _id: { $ne: user._id } 
+      });
+      
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email already in use',
+        });
+      }
+    }
+
+    // Update fields
+    if (name !== undefined) user.name = name;
+    if (email !== undefined) user.email = email;
+    if (profileImage !== undefined) user.profileImage = profileImage;
+
+    await user.save();
+
+    console.log(`✅ Profile updated for user: ${user.phone}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        phone: user.phone,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Profile update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update FCM token
+// @route   PUT /api/auth/fcm-token
+// @access  Private
+exports.updateFcmToken = async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+
+    if (!fcmToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'FCM token is required',
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    user.fcmToken = fcmToken;
+    await user.save();
+
+    console.log(`✅ FCM token updated for user: ${user.phone}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'FCM token updated successfully',
+    });
+  } catch (error) {
+    console.error('❌ FCM token update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update FCM token',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Delete user account
+// @route   DELETE /api/auth/account
+// @access  Private
+exports.deleteAccount = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Soft delete - just mark as inactive
+    user.isActive = false;
+    await user.save();
+
+    console.log(`✅ Account deactivated: ${user.phone}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Account deactivated successfully',
+    });
+  } catch (error) {
+    console.error('❌ Account deletion error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete account',
       error: error.message,
     });
   }
