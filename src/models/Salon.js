@@ -112,6 +112,39 @@ const salonSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // WAIT TIME RELATED FIELDS - ADD THESE
+    totalBarbers: {
+      type: Number,
+      default: 1,
+      min: 1,
+      required: true,
+    },
+    activeBarbers: {
+      type: Number,
+      default: 1,
+      min: 0,
+      validate: {
+        validator: function (v) {
+          return v <= this.totalBarbers;
+        },
+        message: 'Active barbers cannot exceed total barbers',
+      },
+    },
+    averageServiceDuration: {
+      type: Number,
+      default: 30, // minutes
+      min: 5,
+      max: 180,
+    },
+    busyMode: {
+      type: Boolean,
+      default: false,
+    },
+    maxQueueSize: {
+      type: Number,
+      default: 20,
+      min: 1,
+    },
   },
   {
     timestamps: true,
@@ -121,5 +154,13 @@ const salonSchema = new mongoose.Schema(
 // Geospatial index for location queries
 salonSchema.index({ 'location.coordinates': '2dsphere' });
 salonSchema.index({ name: 'text', 'location.city': 'text' });
+
+// Add index for geospatial queries
+// salonSchema.index({ 'location.coordinates': '2dsphere' });
+
+// Add index for active salons
+salonSchema.index({ isActive: 1, isOpen: 1 });
+
+// module.exports = mongoose.model('Salon', salonSchema);
 
 module.exports = mongoose.model('Salon', salonSchema);

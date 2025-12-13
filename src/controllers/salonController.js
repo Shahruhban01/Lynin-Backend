@@ -1,81 +1,43 @@
 const Salon = require('../models/Salon');
+const WaitTimeService = require('../services/waitTimeService');
+const { attachWaitTimesToSalons } = require('../utils/waitTimeHelpers');
 
-// @desc    Get all salons with optional filters
+// @desc    Get all salons with wait times
 // @route   GET /api/salons
 // @access  Public
 exports.getSalons = async (req, res) => {
   try {
-    const {
-      city,
-      search,
-      lat,
-      lng,
-      radius = 10, // km
-      page = 1,
-      limit = 20,
-    } = req.query;
-
-    const query = { isActive: true };
-
-    // City filter
-    if (city) {
-      query['location.city'] = new RegExp(city, 'i');
-    }
-
-    // Text search
-    if (search) {
-      query.$text = { $search: search };
-    }
-
-    // Geolocation filter (nearby salons)
-    if (lat && lng) {
-      query['location.coordinates'] = {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(lng), parseFloat(lat)],
-          },
-          $maxDistance: radius * 1000, // Convert km to meters
-        },
-      };
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const salons = await Salon.find(query)
+    const salons = await Salon.find({ isActive: true })
       .select('-__v')
-      .skip(skip)
-      .limit(parseInt(limit))
-      .sort('-createdAt');
+      .lean();
 
-    const total = await Salon.countDocuments(query);
+    // Attach wait times to all salons
+    const salonsWithWaitTime = await attachWaitTimesToSalons(salons);
 
     res.status(200).json({
       success: true,
-      count: salons.length,
-      total,
-      page: parseInt(page),
-      pages: Math.ceil(total / parseInt(limit)),
-      salons,
+      count: salonsWithWaitTime.length,
+      salons: salonsWithWaitTime,
     });
   } catch (error) {
     console.error('❌ Get salons error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch salons',
+      message: 'Failed to get salons',
       error: error.message,
     });
   }
 };
 
-// @desc    Get single salon by ID
+// @desc    Get single salon by ID with wait time
 // @route   GET /api/salons/:id
 // @access  Public
 exports.getSalonById = async (req, res) => {
   try {
     const salon = await Salon.findById(req.params.id)
       .select('-__v')
-      .populate('ownerId', 'name phone email');
+      .populate('ownerId', 'name phone email')
+      .lean();
 
     if (!salon) {
       return res.status(404).json({
@@ -84,9 +46,16 @@ exports.getSalonById = async (req, res) => {
       });
     }
 
+    // Attach wait time
+    const WaitTimeService = require('../services/waitTimeService');
+    const waitTime = await WaitTimeService.getWaitTimeForSalon(salon);
+
     res.status(200).json({
       success: true,
-      salon,
+      salon: {
+        ...salon,
+        waitTime,
+      },
     });
   } catch (error) {
     console.error('❌ Get salon error:', error);
@@ -98,7 +67,7 @@ exports.getSalonById = async (req, res) => {
   }
 };
 
-// @desc    Get salons near user location
+// @desc    Get salons near user location with wait times
 // @route   GET /api/salons/nearby
 // @access  Public
 exports.getNearbySalons = async (req, res) => {
@@ -123,9 +92,11 @@ exports.getNearbySalons = async (req, res) => {
           $maxDistance: parseFloat(radius) * 1000,
         },
       },
-    }).select('-__v');
+    })
+      .select('-__v')
+      .lean();
 
-    // Calculate distance for each salon
+    // Calculate distance
     const salonsWithDistance = salons.map((salon) => {
       const distance = calculateDistance(
         parseFloat(lat),
@@ -135,15 +106,18 @@ exports.getNearbySalons = async (req, res) => {
       );
 
       return {
-        ...salon.toObject(),
-        distance: Math.round(distance * 10) / 10, // Round to 1 decimal
+        ...salon,
+        distance: Math.round(distance * 10) / 10,
       };
     });
 
+    // Attach wait times
+    const salonsWithWaitTime = await attachWaitTimesToSalons(salonsWithDistance);
+
     res.status(200).json({
       success: true,
-      count: salonsWithDistance.length,
-      salons: salonsWithDistance,
+      count: salonsWithWaitTime.length,
+      salons: salonsWithWaitTime,
     });
   } catch (error) {
     console.error('❌ Get nearby salons error:', error);
@@ -155,7 +129,27 @@ exports.getNearbySalons = async (req, res) => {
   }
 };
 
-// @desc    Create new salon (Admin/Owner only - for testing now)
+// Helper: Calculate distance using Haversine
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRad(deg) {
+  return deg * (Math.PI / 180);
+}
+
+
+// @desc    Create new salon (Admin/Owner only)
 // @route   POST /api/salons
 // @access  Private
 exports.createSalon = async (req, res) => {
@@ -169,6 +163,9 @@ exports.createSalon = async (req, res) => {
       hours,
       services,
       images,
+      totalBarbers,
+      activeBarbers,
+      averageServiceDuration,
     } = req.body;
 
     // Validation
@@ -188,7 +185,10 @@ exports.createSalon = async (req, res) => {
       hours,
       services,
       images,
-      ownerId: req.user._id, // Current authenticated user
+      ownerId: req.user._id,
+      totalBarbers: totalBarbers || 1,
+      activeBarbers: activeBarbers || 1,
+      averageServiceDuration: averageServiceDuration || 30,
     });
 
     console.log(`✅ Salon created: ${salon.name}`);
@@ -229,8 +229,6 @@ function toRad(deg) {
   return deg * (Math.PI / 180);
 }
 
-
-// Salon Owner/Admin specific controllers would go here (update, delete, manage services, etc.)
 // @desc    Get salons owned by current user
 // @route   GET /api/salons/my-salons
 // @access  Private
@@ -259,7 +257,6 @@ exports.getMySalons = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Update salon details
 // @route   PUT /api/salons/:id
@@ -295,6 +292,11 @@ exports.updateSalon = async (req, res) => {
       'images',
       'isOpen',
       'avgServiceTime',
+      'totalBarbers',
+      'activeBarbers',
+      'averageServiceDuration',
+      'busyMode',
+      'maxQueueSize',
     ];
 
     allowedUpdates.forEach((field) => {
@@ -306,6 +308,21 @@ exports.updateSalon = async (req, res) => {
     await salon.save();
 
     console.log(`✅ Salon updated: ${salon.name}`);
+
+    // Emit wait time update
+    const WaitTimeService = require('../services/waitTimeService');
+    const waitTime = await WaitTimeService.calculateWaitTime(
+      salon._id,
+      salon.activeBarbers || 1,
+      salon.averageServiceDuration || 30
+    );
+
+    if (global.io) {
+      global.io.to(`salon_${salon._id}`).emit('wait_time_updated', {
+        salonId: salon._id.toString(),
+        waitTime,
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -322,13 +339,100 @@ exports.updateSalon = async (req, res) => {
   }
 };
 
+// @desc    Toggle busy mode
+// @route   PUT /api/salons/:id/busy-mode
+// @access  Private (Owner)
+exports.toggleBusyMode = async (req, res) => {
+  try {
+    const { busyMode } = req.body;
+    const salon = await Salon.findById(req.params.id);
 
-// module.exports = {
-//   // getSalons: exports.getSalons,
-//   // getSalonById: exports.getSalonById,
-//   // getNearbySalons: exports.getNearbySalons,
-//   // createSalon: exports.createSalon,
-//   getMySalons: exports.getMySalons, // ADD
-//   updateSalon: exports.updateSalon, // ADD
-// };
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
 
+    // Check ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    salon.busyMode = busyMode;
+    await salon.save();
+
+    // ✅ PRD TRIGGER: Busy mode toggled
+    const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+    await emitWaitTimeUpdate(salon._id);
+
+    res.status(200).json({
+      success: true,
+      message: `Busy mode ${busyMode ? 'enabled' : 'disabled'}`,
+      salon,
+    });
+  } catch (error) {
+    console.error('❌ Toggle busy mode error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle busy mode',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update active barbers count
+// @route   PUT /api/salons/:id/active-barbers
+// @access  Private (Owner)
+exports.updateActiveBarbers = async (req, res) => {
+  try {
+    const { activeBarbers } = req.body;
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Check ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    // Validate
+    if (activeBarbers > salon.totalBarbers) {
+      return res.status(400).json({
+        success: false,
+        message: 'Active barbers cannot exceed total barbers',
+      });
+    }
+
+    salon.activeBarbers = activeBarbers;
+    await salon.save();
+
+    // ✅ PRD TRIGGER: Active barbers changed
+    const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+    await emitWaitTimeUpdate(salon._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Active barbers updated',
+      salon,
+    });
+  } catch (error) {
+    console.error('❌ Update active barbers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update active barbers',
+      error: error.message,
+    });
+  }
+};

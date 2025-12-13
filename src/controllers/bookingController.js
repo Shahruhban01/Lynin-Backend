@@ -2,6 +2,34 @@ const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
 const NotificationService = require('../services/notificationService');
+// const WaitTimeService = require('../services/waitTimeService');
+const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+
+
+// Helper to emit wait time update
+// async function emitWaitTimeUpdate(salonId) {
+//   try {
+//     const salon = await Salon.findById(salonId);
+//     if (!salon) return;
+
+//     const waitTime = await WaitTimeService.calculateWaitTime(
+//       salonId,
+//       salon.activeBarbers || 1,
+//       salon.averageServiceDuration || 30
+//     );
+
+//     if (global.io) {
+//       global.io.to(`salon_${salonId}`).emit('wait_time_updated', {
+//         salonId: salonId.toString(),
+//         waitTime,
+//       });
+//     }
+//   } catch (error) {
+//     console.error('Error emitting wait time update:', error);
+//   }
+// }
+
+
 
 
 // @desc    Join queue (create booking)
@@ -127,32 +155,33 @@ exports.joinQueue = async (req, res) => {
     await User.findByIdAndUpdate(userId, {
       $inc: { totalBookings: 1 },
     });
-    
+
     // Emit socket event to salon room
-if (global.io) {
-  global.io.to(`salon_${salonId}`).emit('queue_updated', {
-    salonId: salon._id,
-    queueSize: salon.currentQueueSize + 1,
-  });
-}
+    if (global.io) {
+      global.io.to(`salon_${salonId}`).emit('queue_updated', {
+        salonId: salon._id,
+        queueSize: salon.currentQueueSize + 1,
+      });
+    }
 
-// Send notification to user
-try {
-  const user = await User.findById(userId);
-  if (user && user.fcmToken) {
-    await NotificationService.notifyQueueUpdate(user, booking, salon);
-  }
-} catch (notifError) {
-  console.error('Notification error:', notifError);
-}
+    // Send notification to user
+    try {
+      const user = await User.findById(userId);
+      if (user && user.fcmToken) {
+        await NotificationService.notifyQueueUpdate(user, booking, salon);
+      }
+    } catch (notifError) {
+      console.error('Notification error:', notifError);
+    }
 
-console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
-
-res.status(201).json({
-  success: true,
-  message: 'Successfully joined the queue',
-  booking,
-});
+    console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
+    await emitWaitTimeUpdate(salonId);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Successfully joined the queue',
+      booking,
+    });
 
     // console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
 
@@ -247,7 +276,7 @@ exports.getBookingById = async (req, res) => {
 exports.completeBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate('userId', 'name phone fcmToken')
+      .populate('userId', 'name phone fcmToken loyaltyPoints')
       .populate('salonId', 'name ownerId');
 
     if (!booking) {
@@ -273,10 +302,23 @@ exports.completeBooking = async (req, res) => {
       });
     }
 
-    // Update booking status
+    // Calculate loyalty points (1 point per ₹10 spent)
+    const pointsEarned = Math.floor(booking.totalPrice / 10);
+
+    // Update booking
     booking.status = 'completed';
     booking.completedAt = Date.now();
+    booking.loyaltyPointsEarned = pointsEarned;
     await booking.save();
+
+    // Award points to user
+    const User = require('../models/User');
+    await User.findByIdAndUpdate(
+      booking.userId._id,
+      { $inc: { loyaltyPoints: pointsEarned } }
+    );
+
+    console.log(`✅ Booking completed. ${pointsEarned} points awarded to user ${booking.userId._id}`);
 
     // Update queue positions
     await updateQueuePositions(booking.salonId._id);
@@ -287,6 +329,7 @@ exports.completeBooking = async (req, res) => {
         bookingId: booking._id.toString(),
         salonId: booking.salonId._id.toString(),
         salonName: booking.salonId.name,
+        pointsEarned,
       });
 
       // Update salon room
@@ -309,12 +352,14 @@ exports.completeBooking = async (req, res) => {
       );
     }
 
-    console.log(`✅ Booking completed: ${booking._id}`);
+    await emitWaitTimeUpdate(booking.salonId._id);
+
 
     res.status(200).json({
       success: true,
       message: 'Booking marked as completed',
       booking,
+      pointsEarned,
     });
   } catch (error) {
     console.error('❌ Complete booking error:', error);
@@ -325,6 +370,7 @@ exports.completeBooking = async (req, res) => {
     });
   }
 };
+
 
 
 // @desc    Cancel booking
@@ -412,6 +458,9 @@ exports.cancelBooking = async (req, res) => {
 
     console.log(`✅ Booking cancelled: ${booking._id} by ${isOwner ? 'owner' : 'customer'}`);
 
+    await emitWaitTimeUpdate(booking.salonId._id);
+
+
     res.status(200).json({
       success: true,
       message: 'Booking cancelled successfully',
@@ -426,6 +475,7 @@ exports.cancelBooking = async (req, res) => {
     });
   }
 };
+
 
 
 // Helper function to update queue positions
@@ -486,7 +536,7 @@ exports.completePayment = async (req, res) => {
     booking.paidAmount = booking.totalPrice;
     booking.paymentDate = Date.now();
     booking.paymentMethod = paymentMethod || booking.paymentMethod;
-    
+
     if (transactionId) {
       booking.transactionId = transactionId;
     }
@@ -552,7 +602,7 @@ exports.getSalonBookings = async (req, res) => {
     console.log('✅ Authorization passed');
 
     const query = { salonId };
-    
+
     // Handle comma-separated statuses
     if (status) {
       const statuses = status.split(',').map(s => s.trim());
@@ -638,6 +688,7 @@ exports.startBooking = async (req, res) => {
     }
 
     console.log(`✅ Booking started: ${booking._id}`);
+    await emitWaitTimeUpdate(booking.salonId._id);
 
     res.status(200).json({
       success: true,
@@ -654,6 +705,7 @@ exports.startBooking = async (req, res) => {
   }
 };
 
+
 module.exports = {
   joinQueue: exports.joinQueue,
   getMyBookings: exports.getMyBookings,
@@ -664,3 +716,15 @@ module.exports = {
   getSalonBookings: exports.getSalonBookings, // ADD
   startBooking: exports.startBooking, // ADD
 };
+
+
+// at the end of these functions:
+
+// In joinQueue - add before final res.status(201)
+
+
+// In startBooking - add before final res.status(200)
+
+// In completeBooking - add before final res.status(200)
+
+// In cancelBooking - add before final res.status(200)

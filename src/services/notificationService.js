@@ -122,6 +122,53 @@ class NotificationService {
       },
     });
   }
+    // Send reminder when user's turn is approaching
+  static async notifyTurnApproaching(user, booking, salon) {
+    if (!user.fcmToken) return;
+
+    try {
+      await admin.messaging().send({
+        token: user.fcmToken,
+        notification: {
+          title: '⏰ Your Turn is Approaching!',
+          body: `You're next in line at ${salon.name}. Please be ready!`,
+        },
+        data: {
+          type: 'turn_approaching',
+          bookingId: booking._id.toString(),
+          salonId: salon._id.toString(),
+        },
+      });
+
+      console.log(`✅ Turn approaching notification sent to user ${user._id}`);
+    } catch (error) {
+      console.error('❌ Reminder notification error:', error);
+    }
+  }
+
+  // Send reminder 30 mins before estimated time
+  static async notifyUpcomingBooking(user, booking, salon) {
+    if (!user.fcmToken) return;
+
+    try {
+      await admin.messaging().send({
+        token: user.fcmToken,
+        notification: {
+          title: '🔔 Booking Reminder',
+          body: `Your appointment at ${salon.name} starts in 30 minutes!`,
+        },
+        data: {
+          type: 'booking_reminder',
+          bookingId: booking._id.toString(),
+          salonId: salon._id.toString(),
+        },
+      });
+
+      console.log(`✅ Booking reminder sent to user ${user._id}`);
+    } catch (error) {
+      console.error('❌ Booking reminder error:', error);
+    }
+  }
 }
 
 module.exports = NotificationService;

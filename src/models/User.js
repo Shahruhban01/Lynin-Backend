@@ -35,6 +35,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // ADD FAVORITES
+    favoriteSalons: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Salon',
+    }],
+    // ADD LOYALTY POINTS
+    loyaltyPoints: {
+      type: Number,
+      default: 0,
+    },
     // User preferences
     preferredSalons: [
       {

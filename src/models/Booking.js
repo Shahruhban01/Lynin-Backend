@@ -103,21 +103,35 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-// Rating (after completion)
-rating: {
-  type: Number,
-  min: 1,
-  max: 5,
-  default: null,
-},
-review: {
-  type: String,
-  default: null,
-},
-reviewedAt: {
-  type: Date,
-  default: null,
-},
+    // Rating (after completion)
+    rating: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: null,
+    },
+    review: {
+      type: String,
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    // ADD LOYALTY POINTS
+    loyaltyPointsEarned: {
+      type: Number,
+      default: 0,
+    },
+      // ADD REMINDER TRACKING
+  reminderSent: {
+    type: Boolean,
+    default: false,
+  },
+  turnNotificationSent: {
+    type: Boolean,
+    default: false,
+  },
 
   },
   {
