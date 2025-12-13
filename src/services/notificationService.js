@@ -4,14 +4,31 @@ class NotificationService {
   // Send notification to specific device
   static async sendToDevice(fcmToken, { title, body, data = {} }) {
     try {
+      // const message = {
+      //   notification: {
+      //     title,
+      //     body,
+      //   },
+      //   data,
+      //   token: fcmToken,
+      // };
       const message = {
         notification: {
           title,
           body,
         },
-        data,
+        data: {
+          ...data,
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+          },
+        },
         token: fcmToken,
       };
+
 
       const response = await admin.messaging().send(message);
       console.log(`✅ Notification sent: ${response}`);
@@ -122,7 +139,7 @@ class NotificationService {
       },
     });
   }
-    // Send reminder when user's turn is approaching
+  // Send reminder when user's turn is approaching
   static async notifyTurnApproaching(user, booking, salon) {
     if (!user.fcmToken) return;
 
