@@ -56,6 +56,9 @@ if (process.env.NODE_ENV === 'development') {
 // Make io accessible in routes
 app.set('io', io);
 
+// Add this line with other route imports
+// const dashboardRoutes = require('./routes/dashboard');
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/salons', require('./routes/salonRoutes'));
@@ -63,6 +66,9 @@ app.use('/api/bookings', require('./routes/bookingRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/favorites', require('./routes/favoriteRoutes'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+// app.use('/api/dashboard', dashboardRoutes);
+
 
 // Health check route
 app.get('/api/health', (req, res) => {
