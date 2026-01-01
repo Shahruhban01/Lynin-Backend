@@ -99,9 +99,52 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Socket.io connection handling
+// // Socket.io connection handling
+// io.on('connection', (socket) => {
+//   console.log(`🔌 Socket connected: ${socket.id}`);
+
+//   // User joins their own room (for targeted notifications)
+//   socket.on('join_user_room', (userId) => {
+//     socket.join(`user_${userId}`);
+//     console.log(`✅ User ${userId} joined personal room`);
+//   });
+
+//   // Join salon room (for queue updates)
+//   socket.on('join_salon_room', (salonId) => {
+//     socket.join(`salon_${salonId}`);
+//     console.log(`✅ Joined salon room: ${salonId}`);
+//   });
+
+//   // Leave salon room
+//   socket.on('leave_salon_room', (salonId) => {
+//     socket.leave(`salon_${salonId}`);
+//     console.log(`👋 Left salon room: ${salonId}`);
+//   });
+
+//   // Disconnect
+//   socket.on('disconnect', () => {
+//     console.log(`🔌 Socket disconnected: ${socket.id}`);
+//   });
+// });
+
+// Export io for use in controllers
+global.io = io;
+
+// Socket.io connection handling - UPDATE THIS SECTION
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
+
+  // ✅ AUTHENTICATE SOCKET
+  socket.on('authenticate', (data) => {
+    if (data && data.userId) {
+      socket.userId = data.userId;
+      console.log(`🔐 Socket authenticated: ${socket.id} → User: ${data.userId}`);
+      socket.emit('authenticated', { success: true });
+    } else {
+      console.warn(`⚠️ Socket authentication failed: ${socket.id}`);
+      socket.emit('authenticated', { success: false, error: 'Invalid user ID' });
+    }
+  });
 
   // User joins their own room (for targeted notifications)
   socket.on('join_user_room', (userId) => {
@@ -109,16 +152,38 @@ io.on('connection', (socket) => {
     console.log(`✅ User ${userId} joined personal room`);
   });
 
-  // Join salon room (for queue updates)
-  socket.on('join_salon_room', (salonId) => {
+  // ✅ JOIN SALON ROOM WITH INITIAL WAIT TIME
+  socket.on('join_salon_room', async (salonId) => {
     socket.join(`salon_${salonId}`);
-    console.log(`✅ Joined salon room: ${salonId}`);
+    console.log(`✅ Socket ${socket.id} joined salon room: ${salonId}`);
+
+    // Send initial personalized wait time
+    try {
+      const Salon = require('./models/Salon');
+      const WaitTimeService = require('./services/waitTimeService');
+      
+      const salon = await Salon.findById(salonId);
+      if (salon) {
+        const userId = socket.userId || null;
+        const waitTime = await WaitTimeService.calculateWaitTime(salonId, userId, salon);
+        
+        socket.emit('wait_time_updated', {
+          salonId: salonId,
+          waitTime: waitTime,
+          timestamp: Date.now()
+        });
+        
+        console.log(`   ✅ Sent initial wait time to ${socket.id}: ${waitTime.displayText}`);
+      }
+    } catch (error) {
+      console.error('Error sending initial wait time:', error);
+    }
   });
 
   // Leave salon room
   socket.on('leave_salon_room', (salonId) => {
     socket.leave(`salon_${salonId}`);
-    console.log(`👋 Left salon room: ${salonId}`);
+    console.log(`👋 Socket ${socket.id} left salon room: ${salonId}`);
   });
 
   // Disconnect
@@ -129,6 +194,31 @@ io.on('connection', (socket) => {
 
 // Export io for use in controllers
 global.io = io;
+
+// ✅ AUTO-REFRESH WAIT TIMES EVERY 30 SECONDS
+setInterval(async () => {
+  try {
+    const Booking = require('./models/Booking');
+    const { emitWaitTimeUpdate } = require('./utils/waitTimeHelpers');
+    
+    // Get all salons with active queues
+    const activeSalons = await Booking.distinct('salonId', {
+      status: { $in: ['pending', 'in-progress'] }
+    });
+    
+    if (activeSalons.length > 0) {
+      console.log(`⏰ Auto-refresh: Updating ${activeSalons.length} salons with active queues`);
+      
+      // Broadcast updates for each salon
+      for (const salonId of activeSalons) {
+        await emitWaitTimeUpdate(salonId);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Auto-refresh error:', error);
+  }
+}, 30000); // 30 seconds
+
 
 // Start server
 const PORT = process.env.PORT || 3000;

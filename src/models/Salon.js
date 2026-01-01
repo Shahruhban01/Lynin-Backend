@@ -97,6 +97,10 @@ const salonSchema = new mongoose.Schema(
       type: Number,
       default: 30, // minutes
     },
+    type: {
+      type: String,
+      default: null,
+    },
     // Owner
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -145,6 +149,7 @@ const salonSchema = new mongoose.Schema(
       default: 20,
       min: 1,
     },
+    
   },
   {
     timestamps: true,

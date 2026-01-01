@@ -7,12 +7,14 @@ const { attachWaitTimesToSalons } = require('../utils/waitTimeHelpers');
 // @access  Public
 exports.getSalons = async (req, res) => {
   try {
+    const userId = req.user?._id || null; // ✅ Get user ID if authenticated
+
     const salons = await Salon.find({ isActive: true })
       .select('-__v')
       .lean();
 
-    // Attach wait times to all salons
-    const salonsWithWaitTime = await attachWaitTimesToSalons(salons);
+    // ✅ Attach wait times with user context
+    const salonsWithWaitTime = await attachWaitTimesToSalons(salons, userId);
 
     res.status(200).json({
       success: true,
@@ -29,11 +31,14 @@ exports.getSalons = async (req, res) => {
   }
 };
 
+
 // @desc    Get single salon by ID with wait time
 // @route   GET /api/salons/:id
 // @access  Public
 exports.getSalonById = async (req, res) => {
   try {
+    const userId = req.user?._id || null; // ✅ Get user ID if authenticated
+
     const salon = await Salon.findById(req.params.id)
       .select('-__v')
       .populate('ownerId', 'name phone email')
@@ -46,9 +51,9 @@ exports.getSalonById = async (req, res) => {
       });
     }
 
-    // Attach wait time
+    // ✅ Calculate wait time with user context
     const WaitTimeService = require('../services/waitTimeService');
-    const waitTime = await WaitTimeService.getWaitTimeForSalon(salon);
+    const waitTime = await WaitTimeService.getWaitTimeForSalon(salon, userId);
 
     res.status(200).json({
       success: true,
@@ -67,12 +72,14 @@ exports.getSalonById = async (req, res) => {
   }
 };
 
+
 // @desc    Get salons near user location with wait times
 // @route   GET /api/salons/nearby
 // @access  Public
 exports.getNearbySalons = async (req, res) => {
   try {
     const { lat, lng, radius = 10 } = req.query;
+    const userId = req.user?._id || null; // ✅ Get user ID if authenticated
 
     if (!lat || !lng) {
       return res.status(400).json({
@@ -111,8 +118,8 @@ exports.getNearbySalons = async (req, res) => {
       };
     });
 
-    // Attach wait times
-    const salonsWithWaitTime = await attachWaitTimesToSalons(salonsWithDistance);
+    // ✅ Attach wait times with user context
+    const salonsWithWaitTime = await attachWaitTimesToSalons(salonsWithDistance, userId);
 
     res.status(200).json({
       success: true,
@@ -128,6 +135,7 @@ exports.getNearbySalons = async (req, res) => {
     });
   }
 };
+
 
 // Helper: Calculate distance using Haversine
 function calculateDistance(lat1, lon1, lat2, lon2) {

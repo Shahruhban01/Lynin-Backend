@@ -2,10 +2,8 @@ const WaitTimeService = require('../services/waitTimeService');
 const Salon = require('../models/Salon');
 
 /**
- * Emit wait time update via Socket.io
- * Called after queue-changing events (PRD update triggers)
- * 
- * @param {String} salonId - Salon ID
+ * Emit personalized wait time updates to all users in a salon room
+ * This broadcasts different wait times to each user based on their queue status
  */
 async function emitWaitTimeUpdate(salonId) {
   try {
@@ -15,18 +13,42 @@ async function emitWaitTimeUpdate(salonId) {
       return;
     }
 
-    const waitTime = await WaitTimeService.getWaitTimeForSalon(salon);
-
-    // Emit to salon room (owner dashboard)
-    if (global.io) {
-      global.io.to(`salon_${salonId}`).emit('wait_time_updated', {
-        salonId: salonId.toString(),
-        waitTime,
-        timestamp: new Date().toISOString(),
-      });
+    if (!global.io) {
+      console.warn('⚠️ Socket.IO not initialized');
+      return;
     }
 
-    console.log(`✅ Wait time updated for salon ${salon.name}: ${waitTime.displayText}`);
+    const roomName = `salon_${salonId}`;
+    const room = global.io.sockets.adapter.rooms.get(roomName);
+
+    if (!room || room.size === 0) {
+      console.log(`⚠️ No users connected to salon room: ${roomName}`);
+      return;
+    }
+
+    console.log(`🔄 Broadcasting personalized wait times to ${room.size} users in ${roomName}`);
+
+    // For each connected socket in this salon's room
+    for (const socketId of room) {
+      const socket = global.io.sockets.sockets.get(socketId);
+      if (!socket) continue;
+
+      // Get userId from socket (set during authentication)
+      const userId = socket.userId || null;
+
+      // Calculate personalized wait time for this specific user
+      const waitTime = await WaitTimeService.calculateWaitTime(salonId, userId, salon);
+
+      // Send personalized wait time to this specific socket
+      socket.emit('wait_time_updated', {
+        salonId: salonId.toString(),
+        waitTime: waitTime,
+        timestamp: Date.now()
+      });
+
+      console.log(`   ✅ Sent to socket ${socketId} (user: ${userId || 'anonymous'}): ${waitTime.displayText}`);
+    }
+
   } catch (error) {
     console.error('❌ Error emitting wait time update:', error);
   }
@@ -37,12 +59,13 @@ async function emitWaitTimeUpdate(salonId) {
  * Used in list endpoints
  * 
  * @param {Array} salons - Array of salon documents
+ * @param {String} userId - Optional user ID for personalized wait times
  * @returns {Promise<Array>} Salons with wait time attached
  */
-async function attachWaitTimesToSalons(salons) {
+async function attachWaitTimesToSalons(salons, userId = null) {
   return Promise.all(
     salons.map(async (salon) => {
-      const waitTime = await WaitTimeService.getWaitTimeForSalon(salon);
+      const waitTime = await WaitTimeService.getWaitTimeForSalon(salon, userId);
       return {
         ...salon,
         waitTime,
