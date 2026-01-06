@@ -200,6 +200,247 @@ exports.joinQueue = async (req, res) => {
   }
 };
 
+// @desc    Schedule booking for later
+// @route   POST /api/bookings/schedule
+// @access  Private
+exports.scheduleBooking = async (req, res) => {
+  try {
+    const { salonId, services, notes, scheduledDate, scheduledTime, paymentMethod = 'cash' } = req.body;
+    const userId = req.user._id;
+
+    console.log('📅 Schedule booking request:');
+    console.log('   User:', userId);
+    console.log('   Salon:', salonId);
+    console.log('   Date:', scheduledDate);
+    console.log('   Time:', scheduledTime);
+    console.log('   Services:', JSON.stringify(services));
+
+    // Validation
+    if (!salonId || !services || services.length === 0 || !scheduledDate || !scheduledTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'Salon ID, services, date and time are required',
+      });
+    }
+
+    // Validate date is not in the past
+    const bookingDate = new Date(scheduledDate);
+    bookingDate.setHours(0, 0, 0, 0);
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (bookingDate < today) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot schedule booking in the past',
+      });
+    }
+
+    // Check if salon exists
+    const salon = await Salon.findById(salonId);
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Check if user already has a scheduled booking for same day at same salon
+    const existingScheduled = await Booking.findOne({
+      userId,
+      salonId,
+      bookingType: 'scheduled',
+      scheduledDate: {
+        $gte: bookingDate,
+        $lt: new Date(bookingDate.getTime() + 24 * 60 * 60 * 1000),
+      },
+      status: { $in: ['pending', 'in-progress'] },
+    });
+
+    if (existingScheduled) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have a scheduled booking for this day at this salon',
+      });
+    }
+
+    // Calculate total price and duration
+    let totalPrice = 0;
+    let totalDuration = 0;
+    const bookingServices = [];
+
+    for (const service of services) {
+      const salonService = salon.services.find(
+        (s) => s._id.toString() === service.serviceId
+      );
+
+      if (!salonService) {
+        return res.status(400).json({
+          success: false,
+          message: `Service ${service.serviceId} not found`,
+        });
+      }
+
+      totalPrice += salonService.price;
+      totalDuration += salonService.duration;
+
+      bookingServices.push({
+        serviceId: salonService._id,
+        name: salonService.name,
+        price: salonService.price,
+        duration: salonService.duration,
+      });
+    }
+
+    // Create scheduled booking (not in queue yet)
+    const booking = await Booking.create({
+      userId,
+      salonId,
+      bookingType: 'scheduled',
+      scheduledDate: bookingDate,
+      scheduledTime,
+      services: bookingServices,
+      totalPrice,
+      totalDuration,
+      queuePosition: 0, // Not in queue until arrived
+      status: 'pending',
+      notes: notes || '',
+      paymentMethod,
+      paymentStatus: paymentMethod === 'cash' ? 'pending' : 'pending',
+    });
+
+    // Populate references
+    await booking.populate('salonId', 'name location phone');
+
+    console.log(`✅ Scheduled booking created: User ${userId} scheduled for ${scheduledDate} ${scheduledTime} at ${salon.name}`);
+
+    // Emit socket event to salon room
+    if (global.io) {
+      global.io.to(`salon_${salonId}`).emit('booking_scheduled', {
+        salonId: salon._id,
+        bookingId: booking._id,
+        scheduledDate,
+        scheduledTime,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Booking scheduled successfully',
+      booking,
+    });
+  } catch (error) {
+    console.error('❌ Schedule booking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to schedule booking',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get available time slots for a date
+// @route   GET /api/bookings/available-slots/:salonId?date=YYYY-MM-DD
+// @access  Private
+exports.getAvailableTimeSlots = async (req, res) => {
+  try {
+    const { salonId } = req.params;
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Date parameter is required',
+      });
+    }
+
+    const salon = await Salon.findById(salonId);
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Get day of week
+    const bookingDate = new Date(date);
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[bookingDate.getDay()];
+
+    const dayHours = salon.hours?.[dayName];
+
+    if (!dayHours || dayHours.closed) {
+      return res.status(200).json({
+        success: true,
+        slots: [],
+        message: 'Salon is closed on this day',
+      });
+    }
+
+    // Generate time slots (30-minute intervals)
+    const slots = [];
+    const [openHour, openMinute] = dayHours.open.split(':').map(Number);
+    const [closeHour, closeMinute] = dayHours.close.split(':').map(Number);
+
+    let currentHour = openHour;
+    let currentMinute = openMinute;
+
+    while (
+      currentHour < closeHour ||
+      (currentHour === closeHour && currentMinute < closeMinute)
+    ) {
+      const timeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+      slots.push(timeString);
+
+      // Increment by 30 minutes
+      currentMinute += 30;
+      if (currentMinute >= 60) {
+        currentHour += 1;
+        currentMinute = 0;
+      }
+    }
+
+    // Get existing scheduled bookings for this date
+    const startOfDay = new Date(bookingDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+
+    const existingBookings = await Booking.find({
+      salonId,
+      bookingType: 'scheduled',
+      scheduledDate: { $gte: startOfDay, $lt: endOfDay },
+      status: { $in: ['pending', 'in-progress'] },
+    });
+
+    // Mark booked slots
+    const bookedTimes = existingBookings.map(b => b.scheduledTime);
+
+    const availableSlots = slots.map(slot => ({
+      time: slot,
+      available: !bookedTimes.includes(slot),
+    }));
+
+    res.status(200).json({
+      success: true,
+      slots: availableSlots,
+      dayHours: {
+        open: dayHours.open,
+        close: dayHours.close,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Get available slots error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch available slots',
+      error: error.message,
+    });
+  }
+};
+
+
 // @desc    Get user's bookings
 // @route   GET /api/bookings/my-bookings
 // @access  Private
@@ -305,34 +546,70 @@ exports.completeBooking = async (req, res) => {
     // Calculate loyalty points (1 point per ₹10 spent)
     const pointsEarned = Math.floor(booking.totalPrice / 10);
 
-    // Update booking
+    // Update booking status AND payment status
     booking.status = 'completed';
     booking.completedAt = Date.now();
     booking.loyaltyPointsEarned = pointsEarned;
+    
+    // AUTO-MARK PAYMENT AS PAID
+    booking.paymentStatus = 'paid';
+    booking.paidAmount = booking.totalPrice;
+    booking.paymentDate = Date.now();
+    
     await booking.save();
 
-    // Award points to user
-    const User = require('../models/User');
-    await User.findByIdAndUpdate(
-      booking.userId._id,
-      { $inc: { loyaltyPoints: pointsEarned } }
-    );
-
-    console.log(`✅ Booking completed. ${pointsEarned} points awarded to user ${booking.userId._id}`);
+    // ✅ Award loyalty points to user (only if user exists)
+    if (booking.userId) {
+      console.log('🔍 DEBUG: Before update:');
+      console.log('   User ID:', booking.userId._id);
+      console.log('   Current loyalty points:', booking.userId.loyaltyPoints);
+      console.log('   Points to award:', pointsEarned);
+      
+      // ✅ UPDATED: More explicit update with logging
+      const updatedUser = await User.findByIdAndUpdate(
+        booking.userId._id,
+        { 
+          $inc: { 
+            loyaltyPoints: pointsEarned,
+            totalBookings: 1
+          } 
+        },
+        { 
+          new: true,  // ✅ Return updated document
+          runValidators: true  // ✅ Run schema validators
+        }
+      ).select('name loyaltyPoints totalBookings');
+      
+      console.log('🔍 DEBUG: After update:');
+      console.log('   Updated user:', updatedUser);
+      console.log('   New loyalty points:', updatedUser.loyaltyPoints);
+      console.log('   New total bookings:', updatedUser.totalBookings);
+      
+      if (updatedUser) {
+        console.log(`✅ Booking completed. ${pointsEarned} loyalty points awarded to user ${booking.userId._id}`);
+        console.log(`💰 Payment auto-marked as paid: ₹${booking.totalPrice}`);
+      } else {
+        console.error('❌ ERROR: User update returned null!');
+      }
+    } else {
+      console.log(`✅ Booking completed for walk-in (Token: ${booking.walkInToken || 'N/A'})`);
+      console.log(`💰 Payment auto-marked as paid: ₹${booking.totalPrice}`);
+    }
 
     // Update queue positions
     await updateQueuePositions(booking.salonId._id);
 
-    // Emit socket event to user
+    // Emit socket event
     if (global.io) {
-      global.io.to(`user_${booking.userId._id}`).emit('booking_completed', {
-        bookingId: booking._id.toString(),
-        salonId: booking.salonId._id.toString(),
-        salonName: booking.salonId.name,
-        pointsEarned,
-      });
+      if (booking.userId) {
+        global.io.to(`user_${booking.userId._id}`).emit('booking_completed', {
+          bookingId: booking._id.toString(),
+          salonId: booking.salonId._id.toString(),
+          salonName: booking.salonId.name,
+          pointsEarned,
+        });
+      }
 
-      // Update salon room
       global.io.to(`salon_${booking.salonId._id}`).emit('queue_updated', {
         salonId: booking.salonId._id.toString(),
         queueSize: await Booking.countDocuments({
@@ -342,9 +619,8 @@ exports.completeBooking = async (req, res) => {
       });
     }
 
-    // Send notification
-    const NotificationService = require('../services/notificationService');
-    if (booking.userId.fcmToken) {
+    // Send notification (only if user exists and has FCM token)
+    if (booking.userId && booking.userId.fcmToken) {
       await NotificationService.notifyBookingCompleted(
         booking.userId,
         booking,
@@ -354,12 +630,12 @@ exports.completeBooking = async (req, res) => {
 
     await emitWaitTimeUpdate(booking.salonId._id);
 
-
     res.status(200).json({
       success: true,
-      message: 'Booking marked as completed',
+      message: 'Booking marked as completed and payment recorded',
       booking,
       pointsEarned,
+      paymentStatus: 'paid',
     });
   } catch (error) {
     console.error('❌ Complete booking error:', error);
@@ -370,6 +646,7 @@ exports.completeBooking = async (req, res) => {
     });
   }
 };
+
 
 
 
@@ -563,25 +840,24 @@ exports.completePayment = async (req, res) => {
 
 // Note: Additional booking-related controller functions are here for salons to manage bookings.
 
-// @desc    Get all bookings for a salon (Owner)
+// @desc    Get salon's bookings
 // @route   GET /api/bookings/salon/:salonId
-// @access  Private (Owner)
+// @access  Private (Owner/Manager/Staff)
 exports.getSalonBookings = async (req, res) => {
   try {
     const { salonId } = req.params;
-    const { status } = req.query;
+    const { status, bookingType, startDate, endDate } = req.query;
 
     console.log('📊 Get salon bookings request:');
     console.log('   Salon ID:', salonId);
     console.log('   Status filter:', status);
+    console.log('   Booking type filter:', bookingType);
     console.log('   User ID:', req.user._id);
 
-    // Verify ownership
-    const Salon = require('../models/Salon');
+    // Verify salon ownership/access
     const salon = await Salon.findById(salonId);
 
     if (!salon) {
-      console.error('❌ Salon not found:', salonId);
       return res.status(404).json({
         success: false,
         message: 'Salon not found',
@@ -591,8 +867,8 @@ exports.getSalonBookings = async (req, res) => {
     console.log('   Salon owner:', salon.ownerId);
     console.log('   Current user:', req.user._id);
 
-    if (salon.ownerId.toString() !== req.user._id.toString()) {
-      console.error('❌ Not authorized - ownership mismatch');
+    // Check authorization
+    if (salon.ownerId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to view these bookings',
@@ -601,34 +877,82 @@ exports.getSalonBookings = async (req, res) => {
 
     console.log('✅ Authorization passed');
 
+    // Build query
     const query = { salonId };
 
-    // Handle comma-separated statuses
     if (status) {
-      const statuses = status.split(',').map(s => s.trim());
-      console.log('   Status array:', statuses);
-      query.status = { $in: statuses };
+      const statusArray = status.split(',');
+      console.log('   Status array:', statusArray);
+      query.status = { $in: statusArray };
+    }
+
+    if (bookingType) {
+      console.log('   Booking type:', bookingType);
+      query.bookingType = bookingType;
+    }
+
+    if (startDate && endDate) {
+      query.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
     }
 
     console.log('   Query:', JSON.stringify(query));
 
+    // Fetch bookings
     const bookings = await Booking.find(query)
-      .populate('userId', 'name phone')
-      .sort('queuePosition');
+      .populate('userId', 'name phone email')
+      .sort({ queuePosition: 1, createdAt: -1 })
+      .lean();
 
     console.log(`✅ Found ${bookings.length} bookings`);
     if (bookings.length > 0) {
       console.log('   First booking:', {
         id: bookings[0]._id,
         status: bookings[0].status,
+        type: bookings[0].bookingType,
         position: bookings[0].queuePosition,
+        customerName: bookings[0].userId?.name,
+        walkInToken: bookings[0].walkInToken, // ✅ Log token
       });
     }
 
+    // ✅ Format response with walkInToken
+    const formattedBookings = bookings.map((booking) => ({
+      _id: booking._id,
+      customer: {
+        _id: booking.userId?._id || null,
+        name: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'),
+        phone: booking.userId?.phone || 'N/A',
+        email: booking.userId?.email || null,
+      },
+      walkInToken: booking.walkInToken || null, // ✅ Include token
+      services: booking.services,
+      totalPrice: booking.totalPrice,
+      totalDuration: booking.totalDuration,
+      queuePosition: booking.queuePosition,
+      status: booking.status,
+      bookingType: booking.bookingType,
+      paymentStatus: booking.paymentStatus,
+      paymentMethod: booking.paymentMethod,
+      arrived: booking.arrived || false,
+      arrivedAt: booking.arrivedAt,
+      scheduledDate: booking.scheduledDate,
+      scheduledTime: booking.scheduledTime,
+      joinedAt: booking.joinedAt || booking.createdAt,
+      startedAt: booking.startedAt,
+      completedAt: booking.completedAt,
+      estimatedStartTime: booking.estimatedStartTime,
+      notes: booking.notes,
+      createdAt: booking.createdAt,
+    }));
+
     res.status(200).json({
       success: true,
-      count: bookings.length,
-      bookings,
+      count: formattedBookings.length,
+      bookings: formattedBookings,
+      activeBarbers: salon.activeBarbers || 1, // ✅ ADD THIS
     });
   } catch (error) {
     console.error('❌ Get salon bookings error:', error);
@@ -639,6 +963,8 @@ exports.getSalonBookings = async (req, res) => {
     });
   }
 };
+
+
 
 
 // @desc    Start booking service (Owner)
@@ -715,6 +1041,9 @@ module.exports = {
   completeBooking: exports.completeBooking,
   getSalonBookings: exports.getSalonBookings, // ADD
   startBooking: exports.startBooking, // ADD
+  scheduleBooking: exports.scheduleBooking,
+  getAvailableTimeSlots: exports.getAvailableTimeSlots,
+  
 };
 
 

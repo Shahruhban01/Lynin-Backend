@@ -1,0 +1,92 @@
+const express = require('express');
+const router = express.Router();
+const { protect } = require('../middleware/auth');
+const { requireRole, requireSalonAccess } = require('../middleware/roleCheck');
+const {
+  getQueueBySalon,
+  addWalkInToQueue,
+  updateQueueStatus,
+  markCustomerArrived,
+  startService,
+  completeService,
+  skipCustomer,
+  cancelBooking,
+  getPriorityInsertionLimit,
+  insertPriorityCustomer,
+} = require('../controllers/queueController');
+
+// All routes require authentication
+router.use(protect);
+
+// Get queue for specific salon (salon staff only)
+router.get(
+  '/:salonId',
+  requireRole(['owner', 'manager', 'staff']),
+  requireSalonAccess('salonId'),
+  getQueueBySalon
+);
+
+// Add walk-in customer
+router.post(
+  '/:salonId/walk-in',
+  requireRole(['owner', 'manager', 'staff']),
+  requireSalonAccess('salonId'),
+  addWalkInToQueue
+);
+
+// Mark customer as arrived (QR scan or manual)
+router.post(
+  '/:salonId/arrived',
+  requireRole(['owner', 'manager', 'staff']),
+  requireSalonAccess('salonId'),
+  markCustomerArrived
+);
+
+// Start service for a booking
+router.post(
+  '/:salonId/start/:bookingId',
+  requireRole(['owner', 'manager', 'staff']),
+  requireSalonAccess('salonId'),
+  startService
+);
+
+// Complete service
+router.post(
+  '/:salonId/complete/:bookingId',
+  requireRole(['owner', 'manager', 'staff']),
+  requireSalonAccess('salonId'),
+  completeService
+);
+
+// Skip customer
+router.post(
+  '/:salonId/skip/:bookingId',
+  requireRole(['owner', 'manager']), // Staff cannot skip
+  requireSalonAccess('salonId'),
+  skipCustomer
+);
+
+// Cancel booking
+router.post(
+  '/:salonId/cancel/:bookingId',
+  requireRole(['owner', 'manager']),
+  requireSalonAccess('salonId'),
+  cancelBooking
+);
+
+// Priority insertion
+router.get(
+  '/:salonId/priority-limit',
+  requireRole(['owner', 'manager']),
+  requireSalonAccess('salonId'),
+  getPriorityInsertionLimit
+);
+
+router.post(
+  '/:salonId/priority-insert',
+  requireRole(['owner', 'manager']),
+  requireSalonAccess('salonId'),
+  insertPriorityCustomer
+);
+
+module.exports = router;

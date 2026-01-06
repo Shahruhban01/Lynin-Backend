@@ -4,20 +4,114 @@ const User = require('../models/User');
 const { verifyFirebaseToken } = require('../config/firebase');
 const generateToken = require('../utils/generateToken');
 
+// // @desc    Verify Firebase token and create/update user
+// // @route   POST /api/auth/verify-token
+// // @access  Public
+// exports.verifyToken = async (req, res) => {
+//   try {
+//     // Accept both 'idToken' (owner app) and 'firebaseToken' (customer app)
+//     const { idToken, firebaseToken, phone } = req.body;
+//     const token = idToken || firebaseToken;
+
+//     console.log('📥 Verify Token Request:');
+//     console.log('  Phone:', phone);
+//     console.log('  Token:', token ? `${token.substring(0, 20)}...` : 'undefined');
+
+//     // Validate token
+//     if (!token) {
+//       console.error('❌ No token provided');
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Firebase token is required',
+//       });
+//     }
+
+//     // Verify Firebase token
+//     let decodedToken;
+//     try {
+//       decodedToken = await admin.auth().verifyIdToken(token);
+//       console.log('✅ Firebase token verified for UID:', decodedToken.uid);
+//     } catch (error) {
+//       console.error('❌ Firebase verification failed:', error.message);
+//       return res.status(401).json({
+//         success: false,
+//         message: 'Invalid Firebase token',
+//       });
+//     }
+
+//     const uid = decodedToken.uid;
+//     // Use phone from request body OR from Firebase token
+//     const userPhone = phone || decodedToken.phone_number;
+
+//     console.log('📱 Using phone:', userPhone);
+
+//     if (!userPhone) {
+//       console.error('❌ No phone number available');
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Phone number is required',
+//       });
+//     }
+
+//     // Find or create user
+//     let user = await User.findOne({ firebaseUid: uid });
+
+//     if (!user) {
+//       console.log('📝 Creating new user...');
+//       user = await User.create({
+//         phone: userPhone,
+//         firebaseUid: uid,
+//       });
+//       console.log('✅ New user created:', user._id);
+//     } else {
+//       console.log('✅ Existing user found:', user._id);
+//       user.lastLogin = Date.now();
+//       await user.save();
+//     }
+
+//     // Generate JWT
+//     const token_jwt = jwt.sign(
+//       { userId: user._id, phone: user.phone },
+//       process.env.JWT_SECRET,
+//       { expiresIn: '30d' }
+//     );
+
+//     console.log('✅ JWT generated for user:', user._id);
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Authentication successful',
+//       token: token_jwt,
+//       user: {
+//         _id: user._id,
+//         phone: user.phone,
+//         name: user.name,
+//         email: user.email,
+//       },
+//     });
+//   } catch (error) {
+//     console.error('❌ Verify token error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Authentication failed',
+//       error: error.message,
+//     });
+//   }
+// };
+
 // @desc    Verify Firebase token and create/update user
 // @route   POST /api/auth/verify-token
 // @access  Public
 exports.verifyToken = async (req, res) => {
   try {
-    // Accept both 'idToken' (owner app) and 'firebaseToken' (customer app)
-    const { idToken, firebaseToken, phone } = req.body;
+    const { idToken, firebaseToken, phone, appType } = req.body;
     const token = idToken || firebaseToken;
 
     console.log('📥 Verify Token Request:');
     console.log('  Phone:', phone);
+    console.log('  AppType:', appType); // 'customer' or 'salon'
     console.log('  Token:', token ? `${token.substring(0, 20)}...` : 'undefined');
 
-    // Validate token
     if (!token) {
       console.error('❌ No token provided');
       return res.status(400).json({
@@ -40,7 +134,6 @@ exports.verifyToken = async (req, res) => {
     }
 
     const uid = decodedToken.uid;
-    // Use phone from request body OR from Firebase token
     const userPhone = phone || decodedToken.phone_number;
 
     console.log('📱 Using phone:', userPhone);
@@ -54,31 +147,73 @@ exports.verifyToken = async (req, res) => {
     }
 
     // Find or create user
-    let user = await User.findOne({ firebaseUid: uid });
+    // Find or create user
+    let user = await User.findOne({ firebaseUid: uid }).populate('salonId', 'name isActive');
 
     if (!user) {
       console.log('📝 Creating new user...');
-      user = await User.create({
-        phone: userPhone,
-        firebaseUid: uid,
-      });
-      console.log('✅ New user created:', user._id);
+
+      // ✅ NEW: Check if a walk-in user exists with this phone
+      if (userPhone) {
+        const walkInUser = await User.findOne({
+          phone: userPhone,
+          firebaseUid: { $regex: /^walkin_/ } // Temporary walk-in UID
+        });
+
+        if (walkInUser) {
+          // Link walk-in account to real Firebase UID
+          walkInUser.firebaseUid = uid;
+          walkInUser.lastLogin = Date.now();
+
+          // Update role if not set (walk-ins should be customers)
+          if (!walkInUser.role || walkInUser.role === 'customer') {
+            walkInUser.role = appType === 'salon' ? 'owner' : 'customer';
+          }
+
+          await walkInUser.save();
+          user = walkInUser;
+
+          console.log(`✅ Linked walk-in account to Firebase user: ${userPhone}`);
+        }
+      }
+
+      // If still no user, create new
+      if (!user) {
+        const defaultRole = appType === 'salon' ? 'owner' : 'customer';
+
+        user = await User.create({
+          phone: userPhone,
+          firebaseUid: uid,
+          role: defaultRole,
+        });
+
+        console.log(`✅ New user created with role: ${defaultRole}`);
+      }
     } else {
-      console.log('✅ Existing user found:', user._id);
+      console.log('✅ Existing user found:', user._id, 'Role:', user.role);
       user.lastLogin = Date.now();
       await user.save();
     }
 
-    // Generate JWT
+
+    // Check if salon role user but no salon assigned
+    const isSalonRole = ['owner', 'manager', 'staff'].includes(user.role);
+
+    // Generate JWT with role information
     const token_jwt = jwt.sign(
-      { userId: user._id, phone: user.phone },
+      {
+        userId: user._id,
+        phone: user.phone,
+        role: user.role
+      },
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
 
-    console.log('✅ JWT generated for user:', user._id);
+    console.log('✅ JWT generated for user:', user._id, 'Role:', user.role);
 
-    res.status(200).json({
+    // Prepare response
+    const response = {
       success: true,
       message: 'Authentication successful',
       token: token_jwt,
@@ -87,8 +222,25 @@ exports.verifyToken = async (req, res) => {
         phone: user.phone,
         name: user.name,
         email: user.email,
+        role: user.role,
+        loyaltyPoints: user.loyaltyPoints || 0,
+        salonId: user.salonId?._id || null,
+        salonName: user.salonId?.name || null,
       },
-    });
+    };
+
+    // Add setup status for salon roles
+    if (isSalonRole) {
+      response.setupCompleted = user.setupCompleted || false;
+      response.setupStep = user.setupStep || 'profile';
+
+      // If no salon assigned and role is owner, they need to complete setup
+      if (user.role === 'owner' && !user.salonId) {
+        response.setupRequired = true;
+      }
+    }
+
+    res.status(200).json(response);
   } catch (error) {
     console.error('❌ Verify token error:', error);
     res.status(500).json({
@@ -98,6 +250,7 @@ exports.verifyToken = async (req, res) => {
     });
   }
 };
+
 
 
 
@@ -160,6 +313,7 @@ exports.getMe = async (req, res) => {
         phone: user.phone,
         name: user.name,
         email: user.email,
+        loyaltyPoints: user.loyaltyPoints || 0,
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
       },
@@ -198,6 +352,7 @@ exports.getProfile = async (req, res) => {
         name: user.name,
         email: user.email,
         profileImage: user.profileImage,
+        loyaltyPoints: user.loyaltyPoints || 0,
         totalBookings: user.totalBookings,
         preferredSalons: user.preferredSalons,
         createdAt: user.createdAt,
@@ -241,11 +396,11 @@ exports.updateUserProfile = async (req, res) => {
       }
 
       // Check if email already exists for another user
-      const existingEmail = await User.findOne({ 
-        email, 
-        _id: { $ne: user._id } 
+      const existingEmail = await User.findOne({
+        email,
+        _id: { $ne: user._id }
       });
-      
+
       if (existingEmail) {
         return res.status(400).json({
           success: false,
@@ -272,6 +427,7 @@ exports.updateUserProfile = async (req, res) => {
         name: user.name,
         email: user.email,
         profileImage: user.profileImage,
+        loyaltyPoints: user.loyaltyPoints || 0,
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
       },

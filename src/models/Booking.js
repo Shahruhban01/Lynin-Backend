@@ -6,8 +6,9 @@ const bookingSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
       index: true,
+      default: null, // Allow null for anonymous walk-ins
     },
     salonId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -15,6 +16,27 @@ const bookingSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+
+    // SCHEDULING DETAILS START
+    // ✅ NEW: Booking type and scheduling
+    bookingType: {
+      type: String,
+      enum: ['immediate', 'scheduled'],
+      default: 'immediate',
+      index: true,
+    },
+    scheduledDate: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    scheduledTime: {
+      type: String, // Format: "14:30" (HH:mm)
+      default: null,
+    },
+
+    // SCHEDULING DETAILS END
+
     // Service details
     services: [
       {
@@ -74,6 +96,44 @@ const bookingSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // FOR SALON CHECK-IN SYSTEM
+    arrived: {
+      type: Boolean,
+      default: false,
+    },
+    arrivedAt: {
+      type: Date,
+      default: null,
+    },
+
+    walkInToken: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    // SALON CHECK-IN SYSTEM ENDS
+
+    // Staff assignment
+
+    // Add this field to your Booking schema
+    assignedStaffId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Staff',
+      default: null,
+      index: true,
+    },
+
+    // Add this field for staff-specific notes
+    staffNotes: {
+      type: String,
+      default: '',
+    },
+
+    // Staff assignment ends
+
+
+
     // Status tracking
     status: {
       type: String,
@@ -123,15 +183,15 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-      // ADD REMINDER TRACKING
-  reminderSent: {
-    type: Boolean,
-    default: false,
-  },
-  turnNotificationSent: {
-    type: Boolean,
-    default: false,
-  },
+    // ADD REMINDER TRACKING
+    reminderSent: {
+      type: Boolean,
+      default: false,
+    },
+    turnNotificationSent: {
+      type: Boolean,
+      default: false,
+    },
 
   },
   {
@@ -143,6 +203,7 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.index({ userId: 1, status: 1 });
 bookingSchema.index({ salonId: 1, status: 1 });
 bookingSchema.index({ salonId: 1, queuePosition: 1 });
+bookingSchema.index({ salonId: 1, bookingType: 1, scheduledDate: 1 }); // ✅ NEW
 
 // Update salon queue size when booking status changes
 bookingSchema.post('save', async function () {

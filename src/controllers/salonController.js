@@ -444,3 +444,41 @@ exports.updateActiveBarbers = async (req, res) => {
     });
   }
 };
+
+
+// @desc    Toggle salon open/close status
+// @route   PATCH /api/salons/:salonId/toggle-status
+// @access  Private (Owner/Manager)
+exports.toggleSalonStatus = async (req, res) => {
+  try {
+    const { salonId } = req.params;
+
+    const salon = await Salon.findById(salonId);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Toggle status
+    salon.isActive = !salon.isActive;
+    await salon.save();
+
+    console.log(`✅ Salon status toggled: ${salon.name} - ${salon.isActive ? 'OPEN' : 'CLOSED'}`);
+
+    res.status(200).json({
+      success: true,
+      message: `Salon is now ${salon.isActive ? 'OPEN' : 'CLOSED'}`,
+      isActive: salon.isActive,
+    });
+  } catch (error) {
+    console.error('❌ Toggle salon status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle salon status',
+      error: error.message,
+    });
+  }
+};

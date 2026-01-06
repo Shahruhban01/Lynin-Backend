@@ -65,14 +65,30 @@ const salonSchema = new mongoose.Schema(
       },
     ],
     // Services offered
+    // services: [
+    //   {
+    //     name: { type: String, required: true },
+    //     price: { type: Number, required: true },
+    //     duration: { type: Number, required: true }, // in minutes
+    //     description: { type: String, default: '' },
+    //   },
+    // ],
     services: [
       {
         name: { type: String, required: true },
         price: { type: Number, required: true },
-        duration: { type: Number, required: true }, // in minutes
+        duration: { type: Number, required: true },
         description: { type: String, default: '' },
+        category: {
+          type: String,
+          enum: ['Hair', 'Beard', 'Body', 'Add-on'],
+          required: true
+        }, // ✅ NEW
+        isPrimary: { type: Boolean, default: false }, // ✅ NEW
+        isUpsell: { type: Boolean, default: false }, // ✅ NEW
       },
     ],
+
     // Ratings
     averageRating: {
       type: Number,
@@ -149,7 +165,7 @@ const salonSchema = new mongoose.Schema(
       default: 20,
       min: 1,
     },
-    
+
   },
   {
     timestamps: true,

@@ -9,10 +9,18 @@ const {
   completeBooking,
   getSalonBookings,
   startBooking,
+  scheduleBooking, // ✅ NEW
+  getAvailableTimeSlots,
 } = require('../controllers/bookingController');
 const { protect } = require('../middleware/auth');
 
 // ⚠️ IMPORTANT: Specific routes MUST come BEFORE dynamic routes!
+
+// Schedule booking
+router.post('/schedule', protect, scheduleBooking);
+
+// Get available time slots
+router.get('/available-slots/:salonId', protect, getAvailableTimeSlots);
 
 // Specific customer routes (FIRST)
 router.post('/join-queue', protect, joinQueue);

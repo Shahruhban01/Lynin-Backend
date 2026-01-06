@@ -65,6 +65,36 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+        // SALON-SIDE ROLES (for owner/manager/staff) STARTS
+    role: {
+      type: String,
+      enum: ['customer', 'owner', 'manager', 'staff'],
+      default: 'customer',
+      index: true,
+    },
+    salonId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Salon',
+      default: null, // Only populated for owner/manager/staff
+      index: true,
+    },
+    permissions: {
+      type: [String],
+      default: [],
+      // Examples: ['manage_queue', 'add_walkin', 'view_reports', 'manage_staff']
+    },
+    // First-time setup tracking
+    setupCompleted: {
+      type: Boolean,
+      default: false, // For salon owners/managers/staff
+    },
+    setupStep: {
+      type: String,
+      enum: ['profile', 'hours', 'services', 'capacity', 'completed'],
+      default: null,
+    },
+
+    // SALON SIDE ENDS HERE
   },
   {
     timestamps: true, // Adds createdAt and updatedAt

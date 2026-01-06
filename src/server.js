@@ -3,8 +3,22 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
+
 const connectDatabase = require('./config/database');
 const ReminderService = require('./services/reminderService');
+
+// ===== Route Imports (ALL FIRST) =====
+const authRoutes = require('./routes/authRoutes');
+const salonRoutes = require('./routes/salonRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const favoriteRoutes = require('./routes/favoriteRoutes');
+const salonSetupRoutes = require('./routes/salonSetupRoutes');
+const queueRoutes = require('./routes/queueRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const scheduledBookingRoutes = require('./routes/scheduledBookingRoutes');
+const staffRoutes = require('./routes/staff');
 
 // Initialize Express app
 const app = express();
@@ -59,15 +73,20 @@ app.set('io', io);
 // Add this line with other route imports
 // const dashboardRoutes = require('./routes/dashboard');
 
-// Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/salons', require('./routes/salonRoutes'));
-app.use('/api/bookings', require('./routes/bookingRoutes'));
-app.use('/api/reviews', require('./routes/reviewRoutes'));
-app.use('/api/analytics', require('./routes/analyticsRoutes'));
-app.use('/api/favorites', require('./routes/favoriteRoutes'));
-app.use('/api/dashboard', require('./routes/dashboard'));
-// app.use('/api/dashboard', dashboardRoutes);
+// ===== Route Registration =====
+app.use('/api/auth', authRoutes);
+app.use('/api/salons', salonRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/favorites', favoriteRoutes);
+app.use('/api/salon-setup', salonSetupRoutes);
+app.use('/api/queue', queueRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/scheduled-bookings', scheduledBookingRoutes);
+app.use('/api/staff', staffRoutes);
+
+
 
 
 // Health check route

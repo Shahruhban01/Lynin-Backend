@@ -33,6 +33,7 @@ exports.protect = async (req, res, next) => {
     }
 
     console.log('✅ User authenticated:', user._id);
+    console.log('✅ Phone Number:', user.phone);
     req.user = user;
     next();
   } catch (error) {
