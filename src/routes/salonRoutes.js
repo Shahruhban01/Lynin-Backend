@@ -10,6 +10,9 @@ const {
   updateSalon,
   toggleStaffSystem,        // ✅ ADD
   updateStaffSystemStatus,  // ✅ ADD
+  toggleLocationEdit,
+  updateSalonSettings,
+  togglePhoneChangePermission,
 } = require('../controllers/salonController');
 const { getDashboardStats } = require('../controllers/dashboardController');
 const { protect } = require('../middleware/auth');
@@ -29,6 +32,12 @@ router.put('/:id', protect, updateSalon);
 // ✅ NEW: Staff system toggle routes
 router.put('/:id/toggle-staff-system', protect, toggleStaffSystem);
 router.put('/:id/staff-system', protect, updateStaffSystemStatus);
+router.put('/:id/toggle-location-edit', protect, toggleLocationEdit);
+// Account Settings
+router.put('/:id/settings', protect, updateSalonSettings);
+router.put('/:id/toggle-phone-change', protect, togglePhoneChangePermission);
+
+
 
 
 router.get('/:salonId/dashboard', protect, getDashboardStats);

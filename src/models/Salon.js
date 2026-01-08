@@ -64,6 +64,13 @@ const salonSchema = new mongoose.Schema(
         type: String, // URLs
       },
     ],
+
+    // ✅ NEW: Profile image
+    profileImage: {
+      type: String,
+      default: null, // Firebase Storage URL
+    },
+
     // Services offered
     // services: [
     //   {
@@ -172,6 +179,26 @@ const salonSchema = new mongoose.Schema(
       default: 20,
       min: 1,
     },
+
+    // ✅ NEW: Account Settings
+    operatingMode: {
+      type: String,
+      enum: ['normal', 'busy', 'closed'],
+      default: 'normal',
+    },
+    autoAcceptBookings: {
+      type: Boolean,
+      default: true,
+    },
+    notificationPreferences: {
+      newBookings: { type: Boolean, default: true },
+      queueUpdates: { type: Boolean, default: true },
+      customerMessages: { type: Boolean, default: true },
+      promotions: { type: Boolean, default: true },
+      pushEnabled: { type: Boolean, default: true },
+    },
+    phoneChangeEnabled: { type: Boolean, default: false }, // Admin controlled
+
 
     staffSystemEnabled: { type: Boolean, default: false },
     // ✅ NEW: Location edit permission

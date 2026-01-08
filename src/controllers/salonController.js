@@ -145,9 +145,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -225,9 +225,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
@@ -288,16 +288,16 @@ exports.updateSalon = async (req, res) => {
       });
     }
 
-    // Update allowed fields
+    // ✅ UPDATED: Conditionally allow location updates
     const allowedUpdates = [
       'name',
       'description',
-      'location',
       'phone',
       'email',
       'hours',
       'services',
       'images',
+      'profileImage',
       'isOpen',
       'avgServiceTime',
       'totalBarbers',
@@ -305,7 +305,20 @@ exports.updateSalon = async (req, res) => {
       'averageServiceDuration',
       'busyMode',
       'maxQueueSize',
+      'type', // ✅ NEW: Allow type updates
     ];
+
+    // ✅ NEW: Only allow location update if admin enabled it
+    if (salon.locationEditEnabled) {
+      allowedUpdates.push('location');
+      console.log('✅ Location edit enabled for this salon');
+    } else if (req.body.location) {
+      console.log('⚠️ Location edit attempted but not enabled');
+      return res.status(403).json({
+        success: false,
+        message: 'Location editing is disabled. Please contact support to enable it.',
+      });
+    }
 
     allowedUpdates.forEach((field) => {
       if (req.body[field] !== undefined) {
@@ -316,6 +329,9 @@ exports.updateSalon = async (req, res) => {
     await salon.save();
 
     console.log(`✅ Salon updated: ${salon.name}`);
+    if (req.body.type) {
+      console.log(`   Type changed to: ${req.body.type || 'Not specified'}`);
+    }
 
     // Emit wait time update
     const WaitTimeService = require('../services/waitTimeService');
@@ -346,6 +362,52 @@ exports.updateSalon = async (req, res) => {
     });
   }
 };
+
+// ✅ NEW: Admin endpoint to enable location editing
+// @desc    Enable/Disable location editing for a salon (Admin only)
+// @route   PUT /api/salons/:id/toggle-location-edit
+// @access  Private (Admin only)
+exports.toggleLocationEdit = async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin only.',
+      });
+    }
+
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    salon.locationEditEnabled = !salon.locationEditEnabled;
+    await salon.save();
+
+    console.log(
+      `✅ Location edit ${salon.locationEditEnabled ? 'ENABLED' : 'DISABLED'} for salon: ${salon.name}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Location editing ${salon.locationEditEnabled ? 'enabled' : 'disabled'}`,
+      locationEditEnabled: salon.locationEditEnabled,
+    });
+  } catch (error) {
+    console.error('❌ Toggle location edit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle location edit',
+      error: error.message,
+    });
+  }
+};
+
 
 // @desc    Toggle busy mode
 // @route   PUT /api/salons/:id/busy-mode
@@ -579,6 +641,126 @@ exports.updateStaffSystemStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update staff system',
+      error: error.message,
+    });
+  }
+};
+
+
+// ✅ NEW: Update salon settings (operating mode, notifications, etc.)
+// ✅ UPDATED: Update salon account settings (with isOpen and isActive control)
+// @desc    Update salon account settings
+// @route   PUT /api/salons/:id/settings
+// @access  Private (Owner)
+exports.updateSalonSettings = async (req, res) => {
+  try {
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    const {
+      operatingMode,
+      isOpen,
+      isActive,
+      autoAcceptBookings,
+      notificationPreferences,
+      maxQueueSize,
+    } = req.body;
+
+    // Update fields if provided
+    if (operatingMode) salon.operatingMode = operatingMode;
+    if (typeof isOpen === 'boolean') salon.isOpen = isOpen;
+    if (typeof isActive === 'boolean') salon.isActive = isActive;
+    if (typeof autoAcceptBookings === 'boolean') salon.autoAcceptBookings = autoAcceptBookings;
+    if (typeof maxQueueSize === 'number') salon.maxQueueSize = maxQueueSize;
+    
+    if (notificationPreferences) {
+      salon.notificationPreferences = {
+        ...salon.notificationPreferences,
+        ...notificationPreferences,
+      };
+    }
+
+    await salon.save();
+
+    console.log(`✅ Settings updated for salon: ${salon.name}`);
+    console.log(`   Operating mode: ${salon.operatingMode}`);
+    console.log(`   isOpen: ${salon.isOpen}, isActive: ${salon.isActive}`);
+    console.log(`   Auto-accept: ${salon.autoAcceptBookings}`);
+
+    // Emit wait time update
+    const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+    await emitWaitTimeUpdate(salon._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Settings updated successfully',
+      salon,
+    });
+  } catch (error) {
+    console.error('❌ Update settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update settings',
+      error: error.message,
+    });
+  }
+};
+
+
+// ✅ NEW: Toggle phone change permission (Admin only)
+// @desc    Enable/Disable phone number change for a salon
+// @route   PUT /api/salons/:id/toggle-phone-change
+// @access  Private (Admin only)
+exports.togglePhoneChangePermission = async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin only.',
+      });
+    }
+
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    salon.phoneChangeEnabled = !salon.phoneChangeEnabled;
+    await salon.save();
+
+    console.log(
+      `✅ Phone change ${salon.phoneChangeEnabled ? 'ENABLED' : 'DISABLED'} for salon: ${salon.name}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Phone change ${salon.phoneChangeEnabled ? 'enabled' : 'disabled'}`,
+      phoneChangeEnabled: salon.phoneChangeEnabled,
+    });
+  } catch (error) {
+    console.error('❌ Toggle phone change error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle phone change permission',
       error: error.message,
     });
   }
