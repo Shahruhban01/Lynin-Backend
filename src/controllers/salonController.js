@@ -482,3 +482,104 @@ exports.toggleSalonStatus = async (req, res) => {
     });
   }
 };
+
+
+// ✅ NEW: Toggle staff system
+// @desc    Enable/Disable staff management system
+// @route   PUT /api/salons/:id/toggle-staff-system
+// @access  Private (Owner)
+exports.toggleStaffSystem = async (req, res) => {
+  try {
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    // Toggle the system
+    salon.staffSystemEnabled = !salon.staffSystemEnabled;
+    await salon.save();
+
+    console.log(
+      `✅ Staff system ${salon.staffSystemEnabled ? 'ENABLED' : 'DISABLED'} for salon: ${salon.name}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Staff system ${salon.staffSystemEnabled ? 'enabled' : 'disabled'}`,
+      staffSystemEnabled: salon.staffSystemEnabled,
+    });
+  } catch (error) {
+    console.error('❌ Toggle staff system error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle staff system',
+      error: error.message,
+    });
+  }
+};
+
+// ✅ NEW: Update staff system status
+// @desc    Set staff system enabled/disabled state
+// @route   PUT /api/salons/:id/staff-system
+// @access  Private (Owner)
+exports.updateStaffSystemStatus = async (req, res) => {
+  try {
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'enabled field must be a boolean',
+      });
+    }
+
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    salon.staffSystemEnabled = enabled;
+    await salon.save();
+
+    console.log(
+      `✅ Staff system set to ${enabled ? 'ENABLED' : 'DISABLED'} for salon: ${salon.name}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Staff system ${enabled ? 'enabled' : 'disabled'}`,
+      staffSystemEnabled: salon.staffSystemEnabled,
+    });
+  } catch (error) {
+    console.error('❌ Update staff system error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update staff system',
+      error: error.message,
+    });
+  }
+};

@@ -113,10 +113,17 @@ const salonSchema = new mongoose.Schema(
       type: Number,
       default: 30, // minutes
     },
+    // type: {
+    //   type: String,
+    //   default: null,
+    // },
+    // ✅ NEW: Salon type
     type: {
       type: String,
+      enum: ['men', 'women', 'unisex', null],
       default: null,
     },
+
     // Owner
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -165,6 +172,11 @@ const salonSchema = new mongoose.Schema(
       default: 20,
       min: 1,
     },
+
+    staffSystemEnabled: { type: Boolean, default: false },
+    // ✅ NEW: Location edit permission
+    locationEditEnabled: { type: Boolean, default: false }, // Admin can enable this
+
 
   },
   {

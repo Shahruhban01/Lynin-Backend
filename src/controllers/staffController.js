@@ -366,6 +366,55 @@ exports.getStaffPerformance = async (req, res) => {
   }
 };
 
+// ✅ NEW: Check if staff is currently busy
+// @desc    Check staff availability
+// @route   GET /api/staff/:id/availability
+// @access  Private (Owner)
+exports.checkStaffAvailability = async (req, res) => {
+  try {
+    const staff = await Staff.findById(req.params.id);
+    
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: 'Staff not found',
+      });
+    }
+
+    // Check for in-progress bookings
+    const Booking = require('../models/Booking');
+    const currentBooking = await Booking.findOne({
+      assignedStaffId: staff._id,
+      status: 'in-progress',
+    }).populate('userId', 'name');
+
+    const isBusy = !!currentBooking;
+
+    res.status(200).json({
+      success: true,
+      staffId: staff._id,
+      name: staff.name,
+      isActive: staff.isActive,
+      isAvailable: staff.isAvailable && !isBusy,
+      isBusy: isBusy,
+      currentBooking: currentBooking ? {
+        bookingId: currentBooking._id,
+        customerName: currentBooking.customerName || currentBooking.userId?.name || 'Walk-in',
+        queuePosition: currentBooking.queuePosition,
+        startedAt: currentBooking.startedAt,
+      } : null,
+    });
+  } catch (error) {
+    console.error('❌ Check availability error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check availability',
+      error: error.message,
+    });
+  }
+};
+
+
 // @desc    Toggle staff availability
 // @route   PUT /api/staff/:id/availability
 // @access  Private (Owner/Manager/Staff)
@@ -407,5 +456,6 @@ module.exports = {
   updateStaff: exports.updateStaff,
   deleteStaff: exports.deleteStaff,
   getStaffPerformance: exports.getStaffPerformance,
+  checkStaffAvailability: exports.checkStaffAvailability,
   toggleAvailability: exports.toggleAvailability,
 };

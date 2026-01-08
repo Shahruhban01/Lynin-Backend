@@ -13,10 +13,13 @@ router.post('/', staffController.addStaff);
 router.put('/:id', staffController.updateStaff);
 router.delete('/:id', staffController.deleteStaff);
 
+
 // Staff Performance
 router.get('/:id/performance', staffController.getStaffPerformance);
 
 // Staff Availability
 router.put('/:id/availability', staffController.toggleAvailability);
+router.get('/:id/availability', protect, staffController.checkStaffAvailability);
+
 
 module.exports = router;

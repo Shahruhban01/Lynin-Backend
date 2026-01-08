@@ -8,6 +8,8 @@ const {
   createSalon,
   getMySalons,
   updateSalon,
+  toggleStaffSystem,        // ✅ ADD
+  updateStaffSystemStatus,  // ✅ ADD
 } = require('../controllers/salonController');
 const { getDashboardStats } = require('../controllers/dashboardController');
 const { protect } = require('../middleware/auth');
@@ -21,7 +23,12 @@ router.get('/nearby', getNearbySalons);
 router.get('/my-salons', protect, getMySalons); // MUST BE BEFORE /:id
 router.post('/', protect, createSalon);
 router.put('/:id', protect, updateSalon);
+// router.put('/:id/toggle-staff-system', protect, requireRole(['owner']), toggleStaffSystem);
+// router.put('/:id/staff-system', protect, requireRole(['owner']), updateStaffSystemStatus);
 
+// ✅ NEW: Staff system toggle routes
+router.put('/:id/toggle-staff-system', protect, toggleStaffSystem);
+router.put('/:id/staff-system', protect, updateStaffSystemStatus);
 
 
 router.get('/:salonId/dashboard', protect, getDashboardStats);

@@ -176,7 +176,7 @@ exports.joinQueue = async (req, res) => {
 
     console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
     await emitWaitTimeUpdate(salonId);
-    
+
     res.status(201).json({
       success: true,
       message: 'Successfully joined the queue',
@@ -226,7 +226,7 @@ exports.scheduleBooking = async (req, res) => {
     // Validate date is not in the past
     const bookingDate = new Date(scheduledDate);
     bookingDate.setHours(0, 0, 0, 0);
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -518,7 +518,8 @@ exports.completeBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
       .populate('userId', 'name phone fcmToken loyaltyPoints')
-      .populate('salonId', 'name ownerId');
+      .populate('salonId', 'name ownerId')
+      .populate('assignedStaffId', 'name commissionType commissionRate'); // ADD THIS
 
     if (!booking) {
       return res.status(404).json({
@@ -546,60 +547,62 @@ exports.completeBooking = async (req, res) => {
     // Calculate loyalty points (1 point per ₹10 spent)
     const pointsEarned = Math.floor(booking.totalPrice / 10);
 
+    // ✅ Calculate staff commission
+    let staffCommission = 0;
+    if (booking.assignedStaffId) {
+      const staff = booking.assignedStaffId;
+      if (staff.commissionType === 'percentage') {
+        staffCommission = (booking.totalPrice * staff.commissionRate) / 100;
+      } else if (staff.commissionType === 'fixed') {
+        staffCommission = staff.commissionRate;
+      }
+    }
+
     // Update booking status AND payment status
     booking.status = 'completed';
     booking.completedAt = Date.now();
     booking.loyaltyPointsEarned = pointsEarned;
-    
+
     // AUTO-MARK PAYMENT AS PAID
     booking.paymentStatus = 'paid';
     booking.paidAmount = booking.totalPrice;
     booking.paymentDate = Date.now();
-    
+
     await booking.save();
 
-    // ✅ Award loyalty points to user (only if user exists)
+    // Award loyalty points to user (only if user exists)
     if (booking.userId) {
-      console.log('🔍 DEBUG: Before update:');
-      console.log('   User ID:', booking.userId._id);
-      console.log('   Current loyalty points:', booking.userId.loyaltyPoints);
-      console.log('   Points to award:', pointsEarned);
-      
-      // ✅ UPDATED: More explicit update with logging
-      const updatedUser = await User.findByIdAndUpdate(
+      await User.findByIdAndUpdate(
         booking.userId._id,
-        { 
-          $inc: { 
+        {
+          $inc: {
             loyaltyPoints: pointsEarned,
             totalBookings: 1
-          } 
-        },
-        { 
-          new: true,  // ✅ Return updated document
-          runValidators: true  // ✅ Run schema validators
+          }
         }
-      ).select('name loyaltyPoints totalBookings');
-      
-      console.log('🔍 DEBUG: After update:');
-      console.log('   Updated user:', updatedUser);
-      console.log('   New loyalty points:', updatedUser.loyaltyPoints);
-      console.log('   New total bookings:', updatedUser.totalBookings);
-      
-      if (updatedUser) {
-        console.log(`✅ Booking completed. ${pointsEarned} loyalty points awarded to user ${booking.userId._id}`);
-        console.log(`💰 Payment auto-marked as paid: ₹${booking.totalPrice}`);
-      } else {
-        console.error('❌ ERROR: User update returned null!');
-      }
-    } else {
-      console.log(`✅ Booking completed for walk-in (Token: ${booking.walkInToken || 'N/A'})`);
-      console.log(`💰 Payment auto-marked as paid: ₹${booking.totalPrice}`);
+      );
+      console.log(`✅ Booking completed. ${pointsEarned} loyalty points awarded to user ${booking.userId._id}`);
     }
+
+    // ✅ Update staff stats
+    if (booking.assignedStaffId) {
+      const Staff = require('../models/Staff');
+      await Staff.findByIdAndUpdate(booking.assignedStaffId._id, {
+        $inc: {
+          'stats.completedBookings': 1,
+          'stats.totalRevenue': booking.totalPrice,
+          'stats.totalCommission': staffCommission,
+        },
+      });
+      console.log(`💰 Staff commission: ₹${staffCommission.toFixed(2)}`);
+    }
+
+    console.log(`💰 Payment auto-marked as paid: ₹${booking.totalPrice}`);
 
     // Update queue positions
     await updateQueuePositions(booking.salonId._id);
 
-    // Emit socket event
+    // Emit socket events
     if (global.io) {
       if (booking.userId) {
         global.io.to(`user_${booking.userId._id}`).emit('booking_completed', {
@@ -607,6 +610,13 @@ exports.completeBooking = async (req, res) => {
           salonId: booking.salonId._id.toString(),
           salonName: booking.salonId.name,
           pointsEarned,
+        });
+      }
+
+      if (booking.assignedStaffId) {
+        global.io.to(`staff_${booking.assignedStaffId._id}`).emit('booking_completed', {
+          bookingId: booking._id.toString(),
+          commission: staffCommission,
         });
       }
 
@@ -619,7 +629,7 @@ exports.completeBooking = async (req, res) => {
       });
     }
 
-    // Send notification (only if user exists and has FCM token)
+    // Send notification
     if (booking.userId && booking.userId.fcmToken) {
       await NotificationService.notifyBookingCompleted(
         booking.userId,
@@ -636,6 +646,7 @@ exports.completeBooking = async (req, res) => {
       booking,
       pointsEarned,
       paymentStatus: 'paid',
+      staffCommission: staffCommission.toFixed(2), // ✅ Return commission info
     });
   } catch (error) {
     console.error('❌ Complete booking error:', error);
@@ -646,6 +657,7 @@ exports.completeBooking = async (req, res) => {
     });
   }
 };
+
 
 
 
@@ -852,9 +864,7 @@ exports.getSalonBookings = async (req, res) => {
     console.log('   Salon ID:', salonId);
     console.log('   Status filter:', status);
     console.log('   Booking type filter:', bookingType);
-    console.log('   User ID:', req.user._id);
 
-    // Verify salon ownership/access
     const salon = await Salon.findById(salonId);
 
     if (!salon) {
@@ -864,9 +874,6 @@ exports.getSalonBookings = async (req, res) => {
       });
     }
 
-    console.log('   Salon owner:', salon.ownerId);
-    console.log('   Current user:', req.user._id);
-
     // Check authorization
     if (salon.ownerId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({
@@ -875,19 +882,15 @@ exports.getSalonBookings = async (req, res) => {
       });
     }
 
-    console.log('✅ Authorization passed');
-
     // Build query
     const query = { salonId };
 
     if (status) {
       const statusArray = status.split(',');
-      console.log('   Status array:', statusArray);
       query.status = { $in: statusArray };
     }
 
     if (bookingType) {
-      console.log('   Booking type:', bookingType);
       query.bookingType = bookingType;
     }
 
@@ -898,27 +901,26 @@ exports.getSalonBookings = async (req, res) => {
       };
     }
 
-    console.log('   Query:', JSON.stringify(query));
-
     // Fetch bookings
     const bookings = await Booking.find(query)
       .populate('userId', 'name phone email')
+      .populate('assignedStaffId', 'name role') // ✅ ADD THIS
       .sort({ queuePosition: 1, createdAt: -1 })
       .lean();
 
     console.log(`✅ Found ${bookings.length} bookings`);
+    
+    // ✅ Log first booking with staff info
     if (bookings.length > 0) {
       console.log('   First booking:', {
         id: bookings[0]._id,
         status: bookings[0].status,
-        type: bookings[0].bookingType,
-        position: bookings[0].queuePosition,
-        customerName: bookings[0].userId?.name,
-        walkInToken: bookings[0].walkInToken, // ✅ Log token
+        assignedStaffId: bookings[0].assignedStaffId, // ✅ CHECK THIS
+        customerName: bookings[0].userId?.name || bookings[0].customerName,
       });
     }
 
-    // ✅ Format response with walkInToken
+    // Format response
     const formattedBookings = bookings.map((booking) => ({
       _id: booking._id,
       customer: {
@@ -927,7 +929,11 @@ exports.getSalonBookings = async (req, res) => {
         phone: booking.userId?.phone || 'N/A',
         email: booking.userId?.email || null,
       },
-      walkInToken: booking.walkInToken || null, // ✅ Include token
+      customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'), // ✅ ADD THIS
+      customerPhone: booking.userId?.phone || 'N/A', // ✅ ADD THIS
+      walkInToken: booking.walkInToken || null,
+      assignedStaffId: booking.assignedStaffId?._id || booking.assignedStaffId || null, // ✅ CRITICAL
+      assignedStaffName: booking.assignedStaffId?.name || null, // ✅ BONUS
       services: booking.services,
       totalPrice: booking.totalPrice,
       totalDuration: booking.totalDuration,
@@ -952,7 +958,7 @@ exports.getSalonBookings = async (req, res) => {
       success: true,
       count: formattedBookings.length,
       bookings: formattedBookings,
-      activeBarbers: salon.activeBarbers || 1, // ✅ ADD THIS
+      activeBarbers: salon.activeBarbers || 1,
     });
   } catch (error) {
     console.error('❌ Get salon bookings error:', error);
@@ -967,11 +973,15 @@ exports.getSalonBookings = async (req, res) => {
 
 
 
-// @desc    Start booking service (Owner)
+// Add this to your existing startBooking function
+// ✅ UPDATED: Start booking with busy check
+// @desc    Start booking service (Owner) - WITH STAFF ASSIGNMENT
 // @route   PUT /api/bookings/:id/start
 // @access  Private (Owner)
 exports.startBooking = async (req, res) => {
   try {
+    const { assignedStaffId } = req.body;
+
     const booking = await Booking.findById(req.params.id)
       .populate('userId', 'name phone fcmToken')
       .populate('salonId', 'name ownerId');
@@ -991,21 +1001,83 @@ exports.startBooking = async (req, res) => {
       });
     }
 
+    // ✅ Validate staff if provided
+    if (assignedStaffId) {
+      const Staff = require('../models/Staff');
+      const staff = await Staff.findOne({
+        _id: assignedStaffId,
+        salonId: booking.salonId._id,
+        isActive: true,
+      });
+
+      if (!staff) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or inactive staff member',
+        });
+      }
+
+      // ✅ NEW: Check if staff is already busy with another booking
+      const staffCurrentBooking = await Booking.findOne({
+        assignedStaffId: assignedStaffId,
+        status: 'in-progress',
+        _id: { $ne: req.params.id },
+      });
+
+      if (staffCurrentBooking) {
+        return res.status(400).json({
+          success: false,
+          message: `${staff.name} is currently busy with another customer. Please assign a different staff member.`,
+          busyWith: {
+            bookingId: staffCurrentBooking._id,
+            customerName: staffCurrentBooking.customerName || 'Customer',
+            queuePosition: staffCurrentBooking.queuePosition,
+          },
+        });
+      }
+
+      booking.assignedStaffId = assignedStaffId;
+      console.log(`👤 Assigned staff: ${staff.name} to booking ${booking._id}`);
+    }
+
     booking.status = 'in-progress';
     booking.startedAt = Date.now();
     await booking.save();
 
+    // ✅ Update staff stats if assigned
+    if (assignedStaffId) {
+      const Staff = require('../models/Staff');
+      await Staff.findByIdAndUpdate(assignedStaffId, {
+        $inc: { 'stats.totalBookings': 1 },
+      });
+    }
+
     // Emit socket event
     if (global.io) {
-      global.io.to(`user_${booking.userId._id}`).emit('booking_updated', {
-        bookingId: booking._id.toString(),
-        status: 'in-progress',
-      });
+      if (booking.userId) {
+        global.io.to(`user_${booking.userId._id}`).emit('booking_updated', {
+          bookingId: booking._id.toString(),
+          status: 'in-progress',
+        });
+      }
+
+      if (assignedStaffId) {
+        global.io.to(`staff_${assignedStaffId}`).emit('booking_assigned', {
+          bookingId: booking._id.toString(),
+          customer: booking.userId?.name || 'Walk-in',
+        });
+        
+        // ✅ Update workload
+        global.io.to(`salon_${booking.salonId._id}`).emit('staff_workload_updated', {
+          staffId: assignedStaffId,
+          isBusy: true,
+        });
+      }
     }
 
     // Send notification
     const NotificationService = require('../services/notificationService');
-    if (booking.userId.fcmToken) {
+    if (booking.userId && booking.userId.fcmToken) {
       await NotificationService.notifyBookingStarted(
         booking.userId,
         booking,
@@ -1032,6 +1104,160 @@ exports.startBooking = async (req, res) => {
 };
 
 
+// ✅ NEW: Assign/Reassign staff to booking
+// ✅ UPDATED: Assign/Reassign staff to booking with busy check
+// @desc    Assign staff to booking
+// @route   PUT /api/bookings/:id/assign-staff
+// @access  Private (Owner/Manager)
+exports.assignStaff = async (req, res) => {
+  try {
+    const { staffId } = req.body;
+
+    if (!staffId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Staff ID is required',
+      });
+    }
+
+    const booking = await Booking.findById(req.params.id)
+      .populate('salonId', 'ownerId');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found',
+      });
+    }
+
+    // Verify ownership
+    if (booking.salonId.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    // Validate staff
+    const Staff = require('../models/Staff');
+    const staff = await Staff.findOne({
+      _id: staffId,
+      salonId: booking.salonId._id,
+      isActive: true,
+    });
+
+    if (!staff) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or inactive staff member',
+      });
+    }
+
+    // ✅ NEW: Check if staff is already serving another customer
+    const staffCurrentBooking = await Booking.findOne({
+      assignedStaffId: staffId,
+      status: 'in-progress',
+      _id: { $ne: req.params.id }, // Exclude current booking
+    });
+
+    if (staffCurrentBooking) {
+      return res.status(400).json({
+        success: false,
+        message: `${staff.name} is already serving another customer. Please wait until they finish.`,
+        busyWith: {
+          bookingId: staffCurrentBooking._id,
+          customerName: staffCurrentBooking.customerName || 'Customer',
+          startedAt: staffCurrentBooking.startedAt,
+        },
+      });
+    }
+
+    // Update booking
+    const previousStaffId = booking.assignedStaffId;
+    booking.assignedStaffId = staffId;
+    await booking.save();
+
+    // Update stats
+    if (previousStaffId && previousStaffId.toString() !== staffId) {
+      // Decrease previous staff's count
+      await Staff.findByIdAndUpdate(previousStaffId, {
+        $inc: { 'stats.totalBookings': -1 },
+      });
+    }
+
+    if (!previousStaffId || previousStaffId.toString() !== staffId) {
+      // Increase new staff's count
+      await Staff.findByIdAndUpdate(staffId, {
+        $inc: { 'stats.totalBookings': 1 },
+      });
+    }
+
+    console.log(`✅ Staff ${staff.name} assigned to booking ${booking._id}`);
+
+    // Emit socket event
+    if (global.io) {
+      global.io.to(`staff_${staffId}`).emit('booking_assigned', {
+        bookingId: booking._id.toString(),
+      });
+      
+      // ✅ Emit to salon room to update workload
+      global.io.to(`salon_${booking.salonId._id}`).emit('staff_workload_updated', {
+        staffId: staffId,
+        isBusy: true,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Staff assigned successfully',
+      booking,
+    });
+  } catch (error) {
+    console.error('❌ Assign staff error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to assign staff',
+      error: error.message,
+    });
+  }
+};
+
+
+// ✅ NEW: Get bookings for specific staff
+// @desc    Get staff's assigned bookings
+// @route   GET /api/bookings/staff/:staffId
+// @access  Private
+exports.getStaffBookings = async (req, res) => {
+  try {
+    const { staffId } = req.params;
+    const { status } = req.query;
+
+    const query = { assignedStaffId: staffId };
+    if (status) {
+      query.status = status;
+    }
+
+    const bookings = await Booking.find(query)
+      .populate('userId', 'name phone')
+      .populate('salonId', 'name location')
+      .sort({ queuePosition: 1, createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: bookings.length,
+      bookings,
+    });
+  } catch (error) {
+    console.error('❌ Get staff bookings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch bookings',
+      error: error.message,
+    });
+  }
+};
+
+
 module.exports = {
   joinQueue: exports.joinQueue,
   getMyBookings: exports.getMyBookings,
@@ -1043,7 +1269,9 @@ module.exports = {
   startBooking: exports.startBooking, // ADD
   scheduleBooking: exports.scheduleBooking,
   getAvailableTimeSlots: exports.getAvailableTimeSlots,
-  
+  assignStaff: exports.assignStaff, // ✅ ADD THIS
+  getStaffBookings: exports.getStaffBookings, // ✅ ADD THIS
+
 };
 
 
