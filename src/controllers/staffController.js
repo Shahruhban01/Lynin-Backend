@@ -156,6 +156,15 @@ exports.addStaff = async (req, res) => {
       profileImage: profileImage || null,
     });
 
+    // ✅ Update activeBarbers ONLY if role is barber
+    if (staff.role === 'barber') {
+      await Salon.findByIdAndUpdate(
+        salonId,
+        { $inc: { activeBarbers: 1, totalBarbers: 1 } },
+        { new: true }
+      );
+    }
+
     console.log(`✅ Staff member added: ${staff.name} (${staff.role})`);
 
     res.status(201).json({
@@ -238,7 +247,7 @@ exports.updateStaff = async (req, res) => {
   }
 };
 
-// @desc    Delete/deactivate staff member
+// @desc    Delete / deactivate staff member
 // @route   DELETE /api/staff/:id
 // @access  Private (Owner)
 exports.deleteStaff = async (req, res) => {
@@ -254,6 +263,13 @@ exports.deleteStaff = async (req, res) => {
 
     // Verify salon ownership
     const salon = await Salon.findById(staff.salonId);
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
     if (salon.ownerId.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
@@ -261,15 +277,42 @@ exports.deleteStaff = async (req, res) => {
       });
     }
 
-    // Soft delete (deactivate instead of removing)
+    // Prevent double deletion
+    if (!staff.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Staff already deactivated',
+      });
+    }
+
+    // Capture state BEFORE change
+    const wasBarber = staff.role === 'barber';
+    const wasActiveBarber = wasBarber && staff.isAvailable === true;
+
+    // Soft delete
     staff.isActive = false;
+    staff.isAvailable = false; // important: no longer active
     await staff.save();
 
-    console.log(`✅ Staff deactivated: ${staff.name}`);
+    // ✅ Update salon counters safely
+    if (wasBarber) {
+      const update = {
+        $inc: {
+          totalBarbers: -1,
+          activeBarbers: wasActiveBarber ? -1 : 0,
+        },
+      };
+
+      await Salon.findByIdAndUpdate(staff.salonId, update);
+    }
+
+    console.log(
+      `✅ Staff deactivated: ${staff.name} | barber=${wasBarber} | active=${wasActiveBarber}`
+    );
 
     res.status(200).json({
       success: true,
-      message: 'Staff member deactivated',
+      message: 'Staff member deactivated successfully',
     });
   } catch (error) {
     console.error('❌ Delete staff error:', error);
@@ -280,6 +323,7 @@ exports.deleteStaff = async (req, res) => {
     });
   }
 };
+
 
 // @desc    Get staff performance/analytics
 // @route   GET /api/staff/:id/performance
@@ -316,7 +360,7 @@ exports.getStaffPerformance = async (req, res) => {
     // Calculate metrics
     const totalBookings = bookings.length;
     const totalRevenue = bookings.reduce((sum, b) => sum + b.totalPrice, 0);
-    
+
     let totalCommission = 0;
     if (staff.commissionType === 'percentage') {
       totalCommission = (totalRevenue * staff.commissionRate) / 100;
@@ -373,7 +417,7 @@ exports.getStaffPerformance = async (req, res) => {
 exports.checkStaffAvailability = async (req, res) => {
   try {
     const staff = await Staff.findById(req.params.id);
-    
+
     if (!staff) {
       return res.status(404).json({
         success: false,
@@ -429,14 +473,32 @@ exports.toggleAvailability = async (req, res) => {
       });
     }
 
+    const previousAvailability = staff.isAvailable;
+
+    // Toggle availability
     staff.isAvailable = !staff.isAvailable;
     await staff.save();
 
-    console.log(`✅ ${staff.name} availability: ${staff.isAvailable}`);
+    // ✅ Update salon activeBarbers ONLY for barbers
+    if (staff.role === 'barber' && previousAvailability !== staff.isAvailable) {
+      const increment = staff.isAvailable ? 1 : -1;
+
+      await Salon.findByIdAndUpdate(
+        staff.salonId,
+        { $inc: { activeBarbers: increment } },
+        { new: true }
+      );
+    }
+
+    console.log(
+      `✅ ${staff.name} availability changed: ${previousAvailability} → ${staff.isAvailable}`
+    );
 
     res.status(200).json({
       success: true,
-      message: `Staff ${staff.isAvailable ? 'available' : 'unavailable'}`,
+      message: `Staff ${
+        staff.isAvailable ? 'available' : 'unavailable'
+      }`,
       isAvailable: staff.isAvailable,
     });
   } catch (error) {
@@ -448,6 +510,7 @@ exports.toggleAvailability = async (req, res) => {
     });
   }
 };
+
 
 module.exports = {
   getStaffBySalon: exports.getStaffBySalon,

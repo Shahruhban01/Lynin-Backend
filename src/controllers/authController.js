@@ -442,14 +442,22 @@ exports.updateUserProfile = async (req, res) => {
   }
 };
 
+
+
 // @desc    Update FCM token
-// @route   PUT /api/auth/fcm-token
+// @route   PUT /api/auth/fcm-token OR /api/auth/update-fcm-token
 // @access  Private
 exports.updateFcmToken = async (req, res) => {
   try {
     const { fcmToken } = req.body;
 
+    console.log('📲 FCM Token Update Request:');
+    console.log('   User ID:', req.user._id);
+    console.log('   User Role:', req.user.role);
+    console.log('   FCM Token:', fcmToken ? `${fcmToken.substring(0, 20)}...` : 'null');
+
     if (!fcmToken) {
+      console.error('❌ No FCM token provided');
       return res.status(400).json({
         success: false,
         message: 'FCM token is required',
@@ -459,16 +467,21 @@ exports.updateFcmToken = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (!user) {
+      console.error('❌ User not found:', req.user._id);
       return res.status(404).json({
         success: false,
         message: 'User not found',
       });
     }
 
+    // Check if token changed
+    const tokenChanged = user.fcmToken !== fcmToken;
+    
     user.fcmToken = fcmToken;
     await user.save();
 
-    console.log(`✅ FCM token updated for user: ${user.phone}`);
+    console.log(`✅ FCM token ${tokenChanged ? 'updated' : 'saved'} for user: ${user.phone} (${user.role})`);
+    console.log(`   User name: ${user.name || 'Not set'}`);
 
     res.status(200).json({
       success: true,
@@ -483,6 +496,7 @@ exports.updateFcmToken = async (req, res) => {
     });
   }
 };
+
 
 // @desc    Delete user account
 // @route   DELETE /api/auth/account

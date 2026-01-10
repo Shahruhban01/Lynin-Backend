@@ -164,18 +164,62 @@ exports.joinQueue = async (req, res) => {
       });
     }
 
-    // Send notification to user
-    try {
-      const user = await User.findById(userId);
-      if (user && user.fcmToken) {
-        await NotificationService.notifyQueueUpdate(user, booking, salon);
-      }
-    } catch (notifError) {
-      console.error('Notification error:', notifError);
-    }
+// Send notification to user (customer)
+try {
+  const user = await User.findById(userId);
+  if (user && user.fcmToken) {
+    await NotificationService.notifyQueueUpdate(user, booking, salon);
+  }
+} catch (notifError) {
+  console.error('❌ Customer notification error:', notifError);
+}
 
-    console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
-    await emitWaitTimeUpdate(salonId);
+// ✅ NEW: Send notification to salon owner if enabled
+// ✅ FIXED: Send notification to salon owner
+try {
+  console.log('📤 Attempting to send notification to salon owner...');
+  
+  // Populate owner if not already populated
+  const salonWithOwner = await Salon.findById(salonId).populate('ownerId');
+  
+  if (!salonWithOwner) {
+    console.log('⚠️ Salon not found for notification');
+  } else if (!salonWithOwner.ownerId) {
+    console.log('⚠️ Salon owner not found');
+    console.log('   Salon ownerId:', salonWithOwner.ownerId);
+  } else {
+    const owner = salonWithOwner.ownerId;
+    console.log(`👤 Owner found: ${owner.name} (${owner._id})`);
+    console.log(`   FCM Token: ${owner.fcmToken ? 'Present' : 'Missing'}`);
+    
+    if (owner.fcmToken) {
+      // Get customer info
+      const customer = await User.findById(userId);
+      
+      // Send notification
+      await NotificationService.notifyNewBooking(
+        owner,
+        booking,
+        customer,
+        salonWithOwner
+      );
+      
+      console.log(`✅ New booking notification sent to owner: ${owner.name}`);
+    } else {
+      console.log('⚠️ Owner FCM token not available');
+      console.log('   Owner may need to login to salon app to register FCM token');
+    }
+  }
+} catch (notifError) {
+  console.error('❌ Owner notification error:', notifError);
+  console.error('   Stack:', notifError.stack);
+  // Don't throw - notification failure shouldn't block booking
+}
+
+
+console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
+await emitWaitTimeUpdate(salonId);
+
 
     res.status(201).json({
       success: true,
@@ -1285,3 +1329,4 @@ module.exports = {
 // In completeBooking - add before final res.status(200)
 
 // In cancelBooking - add before final res.status(200)
+

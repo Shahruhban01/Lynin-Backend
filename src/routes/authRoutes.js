@@ -20,6 +20,7 @@ router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateUserProfile);
 router.put('/update-profile', protect, updateProfile); // Legacy endpoint
 router.put('/fcm-token', protect, updateFcmToken);
+router.put('/update-fcm-token', protect, updateFcmToken); // for salon owners
 router.delete('/account', protect, deleteAccount);
 
 module.exports = router;

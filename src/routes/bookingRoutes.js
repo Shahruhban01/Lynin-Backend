@@ -3,8 +3,6 @@ const router = express.Router();
 const bookingController = require('../controllers/bookingController'); // ✅ ADD THIS LINE
 const { protect } = require('../middleware/auth');
 
-// ⚠️ IMPORTANT: Specific routes MUST come BEFORE dynamic routes!
-
 // Schedule booking
 router.post('/schedule', protect, bookingController.scheduleBooking);
 
@@ -26,6 +24,7 @@ router.put('/:id/cancel', protect, bookingController.cancelBooking);
 router.put('/:id/complete-payment', protect, bookingController.completePayment);
 router.put('/:id/complete', protect, bookingController.completeBooking);
 router.put('/:id/start', protect, bookingController.startBooking);
+
 
 // ✅ Staff assignment routes
 router.put('/:id/assign-staff', protect, bookingController.assignStaff);

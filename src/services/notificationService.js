@@ -4,14 +4,6 @@ class NotificationService {
   // Send notification to specific device
   static async sendToDevice(fcmToken, { title, body, data = {} }) {
     try {
-      // const message = {
-      //   notification: {
-      //     title,
-      //     body,
-      //   },
-      //   data,
-      //   token: fcmToken,
-      // };
       const message = {
         notification: {
           title,
@@ -28,7 +20,6 @@ class NotificationService {
         },
         token: fcmToken,
       };
-
 
       const response = await admin.messaging().send(message);
       console.log(`✅ Notification sent: ${response}`);
@@ -58,6 +49,30 @@ class NotificationService {
       console.error('❌ Multicast notification error:', error);
       throw error;
     }
+  }
+
+  // ✅ NEW: Send new booking notification to salon owner
+  static async notifyNewBooking(owner, booking, customer, salon) {
+    if (!owner.fcmToken) {
+      console.log('⚠️ Owner FCM token not found');
+      return;
+    }
+
+    const customerName = customer?.name || 'A customer';
+
+    await this.sendToDevice(owner.fcmToken, {
+      title: '🔔 New Booking',
+      body: `${customerName} joined the queue at position ${booking.queuePosition}`,
+      data: {
+        type: 'new_booking',
+        bookingId: booking._id.toString(),
+        salonId: salon._id.toString(),
+        queuePosition: booking.queuePosition.toString(),
+        customerName: customerName,
+      },
+    });
+
+    console.log(`✅ New booking notification sent to owner: ${owner.name}`);
   }
 
   // Queue position update notification
@@ -139,6 +154,7 @@ class NotificationService {
       },
     });
   }
+
   // Send reminder when user's turn is approaching
   static async notifyTurnApproaching(user, booking, salon) {
     if (!user.fcmToken) return;
