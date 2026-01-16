@@ -13,6 +13,12 @@ const {
   toggleLocationEdit,
   updateSalonSettings,
   togglePhoneChangePermission,
+  getQueueStatusForClosure,
+  closeSalonWithReason,
+  setBusyMode,
+  addService,
+  updateService,
+  deleteService,
 } = require('../controllers/salonController');
 const { getDashboardStats } = require('../controllers/dashboardController');
 const { protect } = require('../middleware/auth');
@@ -36,6 +42,19 @@ router.put('/:id/toggle-location-edit', protect, toggleLocationEdit);
 // Account Settings
 router.put('/:id/settings', protect, updateSalonSettings);
 router.put('/:id/toggle-phone-change', protect, togglePhoneChangePermission);
+
+// Salon closure with queue management
+router.get('/:id/queue-status', protect, getQueueStatusForClosure);
+router.put('/:id/close-with-reason', protect, closeSalonWithReason);
+router.put('/:id/set-busy-mode', protect, setBusyMode);
+
+
+// Service management routes
+router.post('/:id/services', protect, addService);
+router.put('/:id/services/:serviceId', protect, updateService);
+router.delete('/:id/services/:serviceId', protect, deleteService);
+
+
 
 
 

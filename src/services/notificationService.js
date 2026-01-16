@@ -202,6 +202,40 @@ class NotificationService {
       console.error('❌ Booking reminder error:', error);
     }
   }
+
+  // ✅ NEW: Notify customer about salon closure
+  static async notifySalonClosed(customer, salon, reason) {
+  try {
+    if (!customer.fcmToken) {
+      console.log(`⚠️ No FCM token for customer: ${customer.name}`);
+      return;
+    }
+
+    const message = {
+      notification: {
+        title: `${salon.name} is now closed`,
+        body: `Reason: ${reason}. Please check back later or reschedule your booking.`,
+      },
+      data: {
+        type: 'salon_closed',
+        salonId: salon._id.toString(),
+        salonName: salon.name,
+        reason: reason,
+        timestamp: Date.now().toString(),
+      },
+      token: customer.fcmToken,
+    };
+
+    const response = await admin.messaging().send(message);
+    console.log(`✅ Salon closure notification sent to: ${customer.name}`, response);
+
+    return response;
+  } catch (error) {
+    console.error('❌ Salon closure notification error:', error);
+    throw error;
+  }
+};
+
 }
 
 module.exports = NotificationService;

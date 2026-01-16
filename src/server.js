@@ -19,6 +19,12 @@ const queueRoutes = require('./routes/queueRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const scheduledBookingRoutes = require('./routes/scheduledBookingRoutes');
 const staffRoutes = require('./routes/staff');
+const reportsRoutes = require('./routes/reports');
+const faqRoutes = require('./routes/faqs');
+const featureFlagRoutes = require('./routes/featureFlags');
+const appInfoRoutes = require('./routes/appInfo');
+
+
 
 // Initialize Express app
 const app = express();
@@ -85,6 +91,10 @@ app.use('/api/queue', queueRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/scheduled-bookings', scheduledBookingRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/faqs', faqRoutes);
+app.use('/api/feature-flags', featureFlagRoutes);
+app.use('/api/app-info', appInfoRoutes);
 
 
 

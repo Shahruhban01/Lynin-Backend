@@ -1,6 +1,279 @@
 const Salon = require('../models/Salon');
 const WaitTimeService = require('../services/waitTimeService');
 const { attachWaitTimesToSalons } = require('../utils/waitTimeHelpers');
+const Booking = require('../models/Booking');
+const NotificationService = require('../services/notificationService');
+
+// ✅ NEW: Close salon with reason and queue check
+// @desc    Close salon with reason (checks queue status)
+// @route   PUT /api/salons/:id/close-with-reason
+// @access  Private (Owner)
+exports.closeSalonWithReason = async (req, res) => {
+  try {
+    const { reason, customReason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Closure reason is required',
+      });
+    }
+
+    const salon = await Salon.findById(req.params.id).populate('ownerId');
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    // ✅ Check current queue size
+    const activeBookings = await Booking.countDocuments({
+      salonId: salon._id,
+      status: { $in: ['pending', 'in-progress'] },
+    });
+
+    console.log(`🔍 Queue check: ${activeBookings} active bookings`);
+
+    // Get all customers in queue for notifications
+    const queueCustomers = await Booking.find({
+      salonId: salon._id,
+      status: { $in: ['pending', 'in-progress'] },
+    }).populate('userId', 'name phone fcmToken');
+
+    // Update salon status
+    salon.operatingMode = 'closed';
+    salon.isOpen = false;
+    salon.isActive = false;
+    salon.lastClosureReason = reason === 'custom' ? customReason : reason;
+
+    // Add to closure history
+    if (!salon.closureHistory) {
+      salon.closureHistory = [];
+    }
+
+    salon.closureHistory.push({
+      closedAt: new Date(),
+      reason: reason,
+      customReason: reason === 'custom' ? customReason : null,
+      queueSizeAtClosure: activeBookings,
+    });
+
+    await salon.save();
+
+    console.log(`🔒 Salon closed: ${salon.name}`);
+    console.log(`   Reason: ${salon.lastClosureReason}`);
+    console.log(`   Queue size at closure: ${activeBookings}`);
+
+    // ✅ Send notifications to all customers in queue
+    if (queueCustomers.length > 0) {
+      console.log(`📤 Notifying ${queueCustomers.length} customers about closure`);
+
+      for (const booking of queueCustomers) {
+        if (booking.userId && booking.userId.fcmToken) {
+          try {
+            await NotificationService.notifySalonClosed(
+              booking.userId,
+              salon,
+              salon.lastClosureReason
+            );
+          } catch (notifError) {
+            console.error(
+              `❌ Failed to notify customer ${booking.userId.name}:`,
+              notifError
+            );
+          }
+        }
+      }
+
+      console.log(`✅ Closure notifications sent`);
+    }
+
+    // Emit socket event
+    if (global.io) {
+      global.io.to(`salon_${salon._id}`).emit('salon_closed', {
+        salonId: salon._id.toString(),
+        reason: salon.lastClosureReason,
+        queueSize: activeBookings,
+      });
+    }
+
+    // Emit wait time update
+    const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+    await emitWaitTimeUpdate(salon._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Salon closed successfully',
+      salon: {
+        _id: salon._id,
+        name: salon.name,
+        operatingMode: salon.operatingMode,
+        isOpen: salon.isOpen,
+        lastClosureReason: salon.lastClosureReason,
+        queueSizeAtClosure: activeBookings,
+      },
+      notificationsSent: queueCustomers.length,
+    });
+  } catch (error) {
+    console.error('❌ Close salon error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to close salon',
+      error: error.message,
+    });
+  }
+};
+
+// ✅ NEW: Check queue status before closing
+// @desc    Get current queue status for closure check
+// @route   GET /api/salons/:id/queue-status
+// @access  Private (Owner)
+exports.getQueueStatusForClosure = async (req, res) => {
+  try {
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    // Check active bookings
+    const activeBookings = await Booking.find({
+      salonId: salon._id,
+      status: { $in: ['pending', 'in-progress'] },
+    })
+      .populate('userId', 'name phone')
+      .select('queuePosition status userId services totalDuration');
+
+    // Check if currently within working hours
+    const now = new Date();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[now.getDay()];
+    const todayHours = salon.hours?.[dayName];
+
+    let isWithinWorkingHours = false;
+    if (todayHours && !todayHours.closed) {
+      const [openHour, openMin] = todayHours.open.split(':').map(Number);
+      const [closeHour, closeMin] = todayHours.close.split(':').map(Number);
+
+      const openTime = openHour * 60 + openMin;
+      const closeTime = closeHour * 60 + closeMin;
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+
+      isWithinWorkingHours = currentTime >= openTime && currentTime <= closeTime;
+    }
+
+    res.status(200).json({
+      success: true,
+      queueStatus: {
+        hasActiveBookings: activeBookings.length > 0,
+        activeBookingsCount: activeBookings.length,
+        bookings: activeBookings,
+        isWithinWorkingHours,
+        currentDay: dayName,
+        todayHours: todayHours || null,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Get queue status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get queue status',
+      error: error.message,
+    });
+  }
+};
+
+// ✅ NEW: Set salon to busy mode
+// @desc    Set salon to busy mode (no new bookings)
+// @route   PUT /api/salons/:id/set-busy-mode
+// @access  Private (Owner)
+exports.setBusyMode = async (req, res) => {
+  try {
+    const { enabled } = req.body;
+
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    if (enabled) {
+      salon.operatingMode = 'busy';
+      salon.busyMode = true;
+      // Salon remains open, just no new bookings
+      salon.isOpen = true;
+      salon.isActive = true;
+    } else {
+      salon.operatingMode = 'normal';
+      salon.busyMode = false;
+      salon.isOpen = true;
+      salon.isActive = true;
+    }
+
+    await salon.save();
+
+    console.log(`${enabled ? '⏸️' : '▶️'} Busy mode ${enabled ? 'ENABLED' : 'DISABLED'} for: ${salon.name}`);
+
+    // Emit socket event
+    if (global.io) {
+      global.io.to(`salon_${salon._id}`).emit('busy_mode_changed', {
+        salonId: salon._id.toString(),
+        busyMode: salon.busyMode,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Busy mode ${enabled ? 'enabled' : 'disabled'}`,
+      salon: {
+        _id: salon._id,
+        operatingMode: salon.operatingMode,
+        busyMode: salon.busyMode,
+        isOpen: salon.isOpen,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Set busy mode error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to set busy mode',
+      error: error.message,
+    });
+  }
+};
+
 
 // @desc    Get all salons with wait times
 // @route   GET /api/salons
@@ -765,3 +1038,261 @@ exports.togglePhoneChangePermission = async (req, res) => {
     });
   }
 };
+
+
+// Service Controller Starts
+// ✅ NEW: Add service to salon
+// @desc    Add a new service to salon
+// @route   POST /api/salons/:id/services
+// @access  Private (Owner)
+exports.addService = async (req, res) => {
+  try {
+    const { name, price, duration, description, category, isPrimary, isUpsell } = req.body;
+
+    // Validation
+    if (!name || !price || !duration || !category) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, price, duration, and category are required',
+      });
+    }
+
+    if (price < 10 || price > 10000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Price must be between ₹10 and ₹10,000',
+      });
+    }
+
+    if (duration < 5 || duration > 300) {
+      return res.status(400).json({
+        success: false,
+        message: 'Duration must be between 5 and 300 minutes',
+      });
+    }
+
+    if (!['Hair', 'Beard', 'Body', 'Add-on'].includes(category)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid category',
+      });
+    }
+
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    // Check for duplicate service name
+    const duplicate = salon.services.find(
+      (s) => s.name.toLowerCase() === name.toLowerCase().trim()
+    );
+
+    if (duplicate) {
+      return res.status(400).json({
+        success: false,
+        message: 'A service with this name already exists',
+      });
+    }
+
+    const newService = {
+      name: name.trim(),
+      price,
+      duration,
+      description: description?.trim() || '',
+      category,
+      isPrimary: isPrimary || false,
+      isUpsell: isUpsell || false,
+    };
+
+    salon.services.push(newService);
+    await salon.save();
+
+    console.log(`✅ Service added: ${name} to ${salon.name}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Service added successfully',
+      service: salon.services[salon.services.length - 1],
+      salon,
+    });
+  } catch (error) {
+    console.error('❌ Add service error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add service',
+      error: error.message,
+    });
+  }
+};
+
+// ✅ NEW: Update service
+// @desc    Update an existing service
+// @route   PUT /api/salons/:id/services/:serviceId
+// @access  Private (Owner)
+exports.updateService = async (req, res) => {
+  try {
+    const { serviceId } = req.params;
+    const { name, price, duration, description, category, isPrimary, isUpsell } = req.body;
+
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    const service = salon.services.id(serviceId);
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found',
+      });
+    }
+
+    // Validation
+    if (price && (price < 10 || price > 10000)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Price must be between ₹10 and ₹10,000',
+      });
+    }
+
+    if (duration && (duration < 5 || duration > 300)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Duration must be between 5 and 300 minutes',
+      });
+    }
+
+    if (category && !['Hair', 'Beard', 'Body', 'Add-on'].includes(category)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid category',
+      });
+    }
+
+    // Check for duplicate name (excluding current service)
+    if (name) {
+      const duplicate = salon.services.find(
+        (s) =>
+          s._id.toString() !== serviceId &&
+          s.name.toLowerCase() === name.toLowerCase().trim()
+      );
+
+      if (duplicate) {
+        return res.status(400).json({
+          success: false,
+          message: 'A service with this name already exists',
+        });
+      }
+    }
+
+    // Update fields
+    if (name) service.name = name.trim();
+    if (price !== undefined) service.price = price;
+    if (duration !== undefined) service.duration = duration;
+    if (description !== undefined) service.description = description.trim();
+    if (category) service.category = category;
+    if (typeof isPrimary === 'boolean') service.isPrimary = isPrimary;
+    if (typeof isUpsell === 'boolean') service.isUpsell = isUpsell;
+
+    await salon.save();
+
+    console.log(`✅ Service updated: ${service.name} in ${salon.name}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Service updated successfully',
+      service,
+      salon,
+    });
+  } catch (error) {
+    console.error('❌ Update service error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update service',
+      error: error.message,
+    });
+  }
+};
+
+// ✅ NEW: Delete service
+// @desc    Delete a service
+// @route   DELETE /api/salons/:id/services/:serviceId
+// @access  Private (Owner)
+exports.deleteService = async (req, res) => {
+  try {
+    const { serviceId } = req.params;
+
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Verify ownership
+    if (salon.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized',
+      });
+    }
+
+    const service = salon.services.id(serviceId);
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found',
+      });
+    }
+
+    const serviceName = service.name;
+    service.deleteOne();
+    await salon.save();
+
+    console.log(`✅ Service deleted: ${serviceName} from ${salon.name}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Service deleted successfully',
+      salon,
+    });
+  } catch (error) {
+    console.error('❌ Delete service error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete service',
+      error: error.message,
+    });
+  }
+};
+
+// Service Controller Ends

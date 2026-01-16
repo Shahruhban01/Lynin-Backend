@@ -197,6 +197,18 @@ const salonSchema = new mongoose.Schema(
       promotions: { type: Boolean, default: true },
       pushEnabled: { type: Boolean, default: true },
     },
+
+    // Add these fields to salonSchema
+    closureHistory: [
+      {
+        closedAt: { type: Date, default: Date.now },
+        reason: { type: String, required: true },
+        customReason: { type: String, default: null },
+        queueSizeAtClosure: { type: Number, default: 0 },
+        reopenedAt: { type: Date, default: null },
+      }
+    ],
+    lastClosureReason: { type: String, default: null },
     phoneChangeEnabled: { type: Boolean, default: false }, // Admin controlled
 
 
