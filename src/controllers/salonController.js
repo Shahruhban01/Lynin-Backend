@@ -449,7 +449,6 @@ exports.createSalon = async (req, res) => {
       averageServiceDuration,
     } = req.body;
 
-    // Validation
     if (!name || !location || !phone) {
       return res.status(400).json({
         success: false,
@@ -457,6 +456,7 @@ exports.createSalon = async (req, res) => {
       });
     }
 
+    // 1️⃣ Create salon
     const salon = await Salon.create({
       name,
       description,
@@ -472,12 +472,22 @@ exports.createSalon = async (req, res) => {
       averageServiceDuration: averageServiceDuration || 30,
     });
 
-    console.log(`✅ Salon created: ${salon.name}`);
+    // 2️⃣ ATTACH SALON TO USER (THIS WAS MISSING)
+    const user = await User.findById(req.user._id);
+    user.salonId = salon._id;
+    user.role = 'owner'; // enforce
+    await user.save();
 
+    console.log(`✅ Salon created & linked: ${salon.name} → User ${user._id}`);
+
+    // 3️⃣ Return salon explicitly
     res.status(201).json({
       success: true,
       message: 'Salon created successfully',
-      salon,
+      salon: {
+        _id: salon._id,
+        name: salon.name,
+      },
     });
   } catch (error) {
     console.error('❌ Create salon error:', error);
@@ -488,6 +498,62 @@ exports.createSalon = async (req, res) => {
     });
   }
 };
+
+// exports.createSalon = async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       description,
+//       location,
+//       phone,
+//       email,
+//       hours,
+//       services,
+//       images,
+//       totalBarbers,
+//       activeBarbers,
+//       averageServiceDuration,
+//     } = req.body;
+
+//     // Validation
+//     if (!name || !location || !phone) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Name, location, and phone are required',
+//       });
+//     }
+
+//     const salon = await Salon.create({
+//       name,
+//       description,
+//       location,
+//       phone,
+//       email,
+//       hours,
+//       services,
+//       images,
+//       ownerId: req.user._id,
+//       totalBarbers: totalBarbers || 1,
+//       activeBarbers: activeBarbers || 1,
+//       averageServiceDuration: averageServiceDuration || 30,
+//     });
+
+//     console.log(`✅ Salon created: ${salon.name}`);
+
+//     res.status(201).json({
+//       success: true,
+//       message: 'Salon created successfully',
+//       salon,
+//     });
+//   } catch (error) {
+//     console.error('❌ Create salon error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Failed to create salon',
+//       error: error.message,
+//     });
+//   }
+// };
 
 // Helper function to calculate distance using Haversine formula
 function calculateDistance(lat1, lon1, lat2, lon2) {

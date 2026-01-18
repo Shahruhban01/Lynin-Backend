@@ -101,12 +101,14 @@ exports.addStaff = async (req, res) => {
       salary,
       workingHours,
       profileImage,
+      staffSystemEnabled,
     } = req.body;
 
     console.log('👤 Add staff request:');
     console.log('   Salon:', salonId);
     console.log('   Name:', name);
     console.log('   Role:', role);
+    console.log('   Staff System Enabled:', staffSystemEnabled);
 
     // Validation
     if (!salonId || !name || !email || !phone) {
@@ -154,6 +156,8 @@ exports.addStaff = async (req, res) => {
       salary: salary || 0,
       workingHours: workingHours || undefined, // Use default from schema
       profileImage: profileImage || null,
+      // staffSystemEnabled: staffSystemEnabled || false,
+      staffSystemEnabled: staffSystemEnabled ?? false,
     });
 
     // ✅ Update activeBarbers ONLY if role is barber
