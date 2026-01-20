@@ -524,6 +524,8 @@ exports.completeService = async (req, res) => {
 };
 
 
+// controllers/queueController.js (or wherever your queue functions are)
+
 // @desc    Skip customer
 // @route   POST /api/queue/:salonId/skip/:bookingId
 // @access  Private (Owner/Manager)
@@ -548,32 +550,58 @@ exports.skipCustomer = async (req, res) => {
       });
     }
 
+    // ✅ Save original position before changing
+    const originalPosition = booking.queuePosition;
+
+    // ✅ Find highest position (including skipped items)
     const maxPosition = await Booking.findOne({
       salonId,
-      status: { $in: ['pending', 'in-progress'] },
+      status: { $in: ['pending', 'in-progress', 'skipped'] },
     })
       .sort({ queuePosition: -1 })
       .select('queuePosition');
 
-    booking.queuePosition = maxPosition ? maxPosition.queuePosition + 1 : 1;
-    booking.notes = `Skipped: ${reason}`;
+    const newPosition = maxPosition ? maxPosition.queuePosition + 1 : 1;
+
+    // ✅ Update booking with skip metadata
+    booking.status = 'skipped';
+    booking.queuePosition = newPosition; // Move to end
+    booking.skippedAt = new Date();
+    booking.originalPosition = originalPosition;
+    booking.skipReason = reason;
+    booking.notes = booking.notes ? `${booking.notes} | Skipped: ${reason}` : `Skipped: ${reason}`;
     await booking.save();
 
-    console.log(`⏭️ Customer skipped: Booking ${bookingId} - Reason: ${reason}`);
+    console.log(`⏭️ Customer skipped: Booking ${bookingId}`);
+    console.log(`   Original position: ${originalPosition} → New position: ${newPosition}`);
+    console.log(`   Reason: ${reason}`);
 
-    await _reorderQueuePositions(salonId);
+    // ✅ Reorder active (non-skipped) bookings
+    await _reorderActiveBookings(salonId);
 
     // Emit socket event
     if (global.io) {
-      global.io.to(`salon_${salonId}`).emit('customer_skipped', {
-        bookingId: booking._id,
-        reason,
+      global.io.to(`salon_${salonId}`).emit('queue_updated', {
+        action: 'customer_skipped',
+        bookingId: booking._id.toString(),
+        salonId: salonId.toString(),
       });
     }
+
+    // Emit wait time update
+    const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+    await emitWaitTimeUpdate(salonId);
 
     res.status(200).json({
       success: true,
       message: 'Customer skipped',
+      booking: {
+        _id: booking._id,
+        status: booking.status,
+        queuePosition: booking.queuePosition,
+        skippedAt: booking.skippedAt,
+        originalPosition: booking.originalPosition,
+      },
     });
   } catch (error) {
     console.error('❌ Skip customer error:', error);
@@ -584,6 +612,129 @@ exports.skipCustomer = async (req, res) => {
     });
   }
 };
+
+// @desc    Undo skip - restore customer to queue
+// @route   POST /api/queue/:salonId/undo-skip/:bookingId
+// @access  Private (Owner/Manager)
+exports.undoSkip = async (req, res) => {
+  try {
+    const { salonId, bookingId } = req.params;
+    const { returnToOriginal, originalPosition } = req.body;
+
+    const booking = await Booking.findOne({ _id: bookingId, salonId });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found',
+      });
+    }
+
+    if (booking.status !== 'skipped') {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking is not in skipped status',
+      });
+    }
+
+    let newPosition;
+    let message;
+
+    if (returnToOriginal && originalPosition) {
+      // ✅ Return to original position (within 5 minutes)
+      newPosition = originalPosition;
+
+      // Shift other active bookings down to make space
+      await Booking.updateMany(
+        {
+          salonId,
+          status: { $in: ['pending', 'in-progress'] },
+          queuePosition: { $gte: originalPosition },
+        },
+        {
+          $inc: { queuePosition: 1 },
+        }
+      );
+
+      message = `Customer restored to original position ${originalPosition}`;
+      console.log(`↩️ Undo skip: Restored to position ${originalPosition}`);
+    } else {
+      // ✅ Add to end of active queue (after 5 minutes)
+      const lastActiveBooking = await Booking.findOne({
+        salonId,
+        status: { $in: ['pending', 'in-progress'] },
+      })
+        .sort({ queuePosition: -1 })
+        .select('queuePosition');
+
+      newPosition = lastActiveBooking ? lastActiveBooking.queuePosition + 1 : 1;
+      message = `Customer added to end of queue at position ${newPosition}`;
+      console.log(`↩️ Undo skip: Added to end at position ${newPosition}`);
+    }
+
+    // ✅ Update booking
+    booking.status = 'pending';
+    booking.queuePosition = newPosition;
+    booking.skippedAt = null;
+    booking.originalPosition = null;
+    booking.skipReason = null;
+    await booking.save();
+
+    // Reorder queue
+    await _reorderActiveBookings(salonId);
+
+    // Emit socket event
+    if (global.io) {
+      global.io.to(`salon_${salonId}`).emit('queue_updated', {
+        action: 'skip_undone',
+        bookingId: booking._id.toString(),
+        salonId: salonId.toString(),
+      });
+    }
+
+    // Emit wait time update
+    const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+    await emitWaitTimeUpdate(salonId);
+
+    res.status(200).json({
+      success: true,
+      message,
+      booking: {
+        _id: booking._id,
+        status: booking.status,
+        queuePosition: booking.queuePosition,
+        returnedToOriginal: returnToOriginal || false,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Undo skip error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to undo skip',
+      error: error.message,
+    });
+  }
+};
+
+// Helper: Reorder only active (non-skipped) bookings
+async function _reorderActiveBookings(salonId) {
+  // Get active bookings sorted by position
+  const activeBookings = await Booking.find({
+    salonId,
+    status: { $in: ['pending', 'in-progress'] },
+  }).sort({ queuePosition: 1 });
+
+  // Reassign positions sequentially (A-1, A-2, A-3...)
+  for (let i = 0; i < activeBookings.length; i++) {
+    if (activeBookings[i].queuePosition !== i + 1) {
+      activeBookings[i].queuePosition = i + 1;
+      await activeBookings[i].save();
+    }
+  }
+
+  console.log(`🔄 Active queue reordered for salon ${salonId}: ${activeBookings.length} positions`);
+}
+
 
 // @desc    Cancel booking
 // @route   POST /api/queue/:salonId/cancel/:bookingId

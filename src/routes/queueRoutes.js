@@ -10,6 +10,7 @@ const {
   startService,
   completeService,
   skipCustomer,
+  undoSkip, // ✅ Make sure this is imported
   cancelBooking,
   getPriorityInsertionLimit,
   insertPriorityCustomer,
@@ -61,9 +62,17 @@ router.post(
 // Skip customer
 router.post(
   '/:salonId/skip/:bookingId',
-  requireRole(['owner', 'manager']), // Staff cannot skip
+  requireRole(['owner', 'manager']),
   requireSalonAccess('salonId'),
   skipCustomer
+);
+
+// ✅ UNDO SKIP - ADD THIS (same pattern as skip route)
+router.post(
+  '/:salonId/undo-skip/:bookingId',
+  requireRole(['owner', 'manager']),
+  requireSalonAccess('salonId'),
+  undoSkip
 );
 
 // Cancel booking

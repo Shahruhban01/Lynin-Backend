@@ -137,9 +137,24 @@ const bookingSchema = new mongoose.Schema(
     // Status tracking
     status: {
       type: String,
-      enum: ['pending', 'in-progress', 'completed', 'cancelled', 'no-show'],
+      enum: ['pending', 'in-progress', 'completed', 'skipped', 'cancelled', 'no-show'],
       default: 'pending',
       index: true,
+    },
+    // ✅ NEW: Track skip information
+    skippedAt: {
+      type: Date,
+      default: null
+    },
+
+    originalPosition: {
+      type: Number,
+      default: null
+    },
+
+    skipReason: {
+      type: String,
+      default: null
     },
     // Timestamps
     joinedAt: {

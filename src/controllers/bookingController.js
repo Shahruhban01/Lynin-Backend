@@ -164,61 +164,61 @@ exports.joinQueue = async (req, res) => {
       });
     }
 
-// Send notification to user (customer)
-try {
-  const user = await User.findById(userId);
-  if (user && user.fcmToken) {
-    await NotificationService.notifyQueueUpdate(user, booking, salon);
-  }
-} catch (notifError) {
-  console.error('❌ Customer notification error:', notifError);
-}
-
-// ✅ NEW: Send notification to salon owner if enabled
-// ✅ FIXED: Send notification to salon owner
-try {
-  console.log('📤 Attempting to send notification to salon owner...');
-  
-  // Populate owner if not already populated
-  const salonWithOwner = await Salon.findById(salonId).populate('ownerId');
-  
-  if (!salonWithOwner) {
-    console.log('⚠️ Salon not found for notification');
-  } else if (!salonWithOwner.ownerId) {
-    console.log('⚠️ Salon owner not found');
-    console.log('   Salon ownerId:', salonWithOwner.ownerId);
-  } else {
-    const owner = salonWithOwner.ownerId;
-    console.log(`👤 Owner found: ${owner.name} (${owner._id})`);
-    console.log(`   FCM Token: ${owner.fcmToken ? 'Present' : 'Missing'}`);
-    
-    if (owner.fcmToken) {
-      // Get customer info
-      const customer = await User.findById(userId);
-      
-      // Send notification
-      await NotificationService.notifyNewBooking(
-        owner,
-        booking,
-        customer,
-        salonWithOwner
-      );
-      
-      console.log(`✅ New booking notification sent to owner: ${owner.name}`);
-    } else {
-      console.log('⚠️ Owner FCM token not available');
-      console.log('   Owner may need to login to salon app to register FCM token');
+    // Send notification to user (customer)
+    try {
+      const user = await User.findById(userId);
+      if (user && user.fcmToken) {
+        await NotificationService.notifyQueueUpdate(user, booking, salon);
+      }
+    } catch (notifError) {
+      console.error('❌ Customer notification error:', notifError);
     }
-  }
-} catch (notifError) {
-  console.error('❌ Owner notification error:', notifError);
-  console.error('   Stack:', notifError.stack);
-  // Don't throw - notification failure shouldn't block booking
-}
+
+    // ✅ NEW: Send notification to salon owner if enabled
+    // ✅ FIXED: Send notification to salon owner
+    try {
+      console.log('📤 Attempting to send notification to salon owner...');
+
+      // Populate owner if not already populated
+      const salonWithOwner = await Salon.findById(salonId).populate('ownerId');
+
+      if (!salonWithOwner) {
+        console.log('⚠️ Salon not found for notification');
+      } else if (!salonWithOwner.ownerId) {
+        console.log('⚠️ Salon owner not found');
+        console.log('   Salon ownerId:', salonWithOwner.ownerId);
+      } else {
+        const owner = salonWithOwner.ownerId;
+        console.log(`👤 Owner found: ${owner.name} (${owner._id})`);
+        console.log(`   FCM Token: ${owner.fcmToken ? 'Present' : 'Missing'}`);
+
+        if (owner.fcmToken) {
+          // Get customer info
+          const customer = await User.findById(userId);
+
+          // Send notification
+          await NotificationService.notifyNewBooking(
+            owner,
+            booking,
+            customer,
+            salonWithOwner
+          );
+
+          console.log(`✅ New booking notification sent to owner: ${owner.name}`);
+        } else {
+          console.log('⚠️ Owner FCM token not available');
+          console.log('   Owner may need to login to salon app to register FCM token');
+        }
+      }
+    } catch (notifError) {
+      console.error('❌ Owner notification error:', notifError);
+      console.error('   Stack:', notifError.stack);
+      // Don't throw - notification failure shouldn't block booking
+    }
 
 
-console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
-await emitWaitTimeUpdate(salonId);
+    console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
+    await emitWaitTimeUpdate(salonId);
 
 
     res.status(201).json({
@@ -953,7 +953,7 @@ exports.getSalonBookings = async (req, res) => {
       .lean();
 
     console.log(`✅ Found ${bookings.length} bookings`);
-    
+
     // ✅ Log first booking with staff info
     if (bookings.length > 0) {
       console.log('   First booking:', {
@@ -965,6 +965,8 @@ exports.getSalonBookings = async (req, res) => {
     }
 
     // Format response
+    // In your getSalonBookings function, update this part:
+
     const formattedBookings = bookings.map((booking) => ({
       _id: booking._id,
       customer: {
@@ -973,11 +975,11 @@ exports.getSalonBookings = async (req, res) => {
         phone: booking.userId?.phone || 'N/A',
         email: booking.userId?.email || null,
       },
-      customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'), // ✅ ADD THIS
-      customerPhone: booking.userId?.phone || 'N/A', // ✅ ADD THIS
+      customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'),
+      customerPhone: booking.userId?.phone || 'N/A',
       walkInToken: booking.walkInToken || null,
-      assignedStaffId: booking.assignedStaffId?._id || booking.assignedStaffId || null, // ✅ CRITICAL
-      assignedStaffName: booking.assignedStaffId?.name || null, // ✅ BONUS
+      assignedStaffId: booking.assignedStaffId?._id || booking.assignedStaffId || null,
+      assignedStaffName: booking.assignedStaffId?.name || null,
       services: booking.services,
       totalPrice: booking.totalPrice,
       totalDuration: booking.totalDuration,
@@ -996,6 +998,11 @@ exports.getSalonBookings = async (req, res) => {
       estimatedStartTime: booking.estimatedStartTime,
       notes: booking.notes,
       createdAt: booking.createdAt,
+
+      // ✅ ADD THESE FIELDS
+      skippedAt: booking.skippedAt || null,
+      originalPosition: booking.originalPosition || null,
+      skipReason: booking.skipReason || null,
     }));
 
     res.status(200).json({
@@ -1110,7 +1117,7 @@ exports.startBooking = async (req, res) => {
           bookingId: booking._id.toString(),
           customer: booking.userId?.name || 'Walk-in',
         });
-        
+
         // ✅ Update workload
         global.io.to(`salon_${booking.salonId._id}`).emit('staff_workload_updated', {
           staffId: assignedStaffId,
@@ -1243,7 +1250,7 @@ exports.assignStaff = async (req, res) => {
       global.io.to(`staff_${staffId}`).emit('booking_assigned', {
         bookingId: booking._id.toString(),
       });
-      
+
       // ✅ Emit to salon room to update workload
       global.io.to(`salon_${booking.salonId._id}`).emit('staff_workload_updated', {
         staffId: staffId,
@@ -1329,4 +1336,6 @@ module.exports = {
 // In completeBooking - add before final res.status(200)
 
 // In cancelBooking - add before final res.status(200)
+
+
 
