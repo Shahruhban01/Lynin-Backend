@@ -24,6 +24,12 @@ const faqRoutes = require('./routes/faqs');
 const featureFlagRoutes = require('./routes/featureFlags');
 const appInfoRoutes = require('./routes/appInfo');
 
+// Import admin routes
+const adminAuthRoutes = require('./routes/adminAuthRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+// const adminRoutes = require('./routes/adminRoutes');
+
+
 
 
 // Initialize Express app
@@ -95,6 +101,18 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/feature-flags', featureFlagRoutes);
 app.use('/api/app-info', appInfoRoutes);
+
+// Register admin routes
+// Register admin routes (order matters!)
+app.use('/api/admin/auth', adminAuthRoutes); // Auth endpoints
+app.use('/api/admin', adminRoutes); // Protected admin endpoints
+// app.use('/api/admin', adminRoutes);
+
+
+
+
+
+
 
 
 

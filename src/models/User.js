@@ -68,7 +68,7 @@ const userSchema = new mongoose.Schema(
         // SALON-SIDE ROLES (for owner/manager/staff) STARTS
     role: {
       type: String,
-      enum: ['customer', 'owner', 'manager', 'staff'],
+      enum: ['customer', 'owner', 'manager', 'staff', 'admin'],
       default: 'customer',
       index: true,
     },

@@ -198,6 +198,25 @@ const salonSchema = new mongoose.Schema(
       pushEnabled: { type: Boolean, default: true },
     },
 
+    // ADMIN SIDE ONLY FIELDS
+verificationMeta: {
+  verifiedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
+  verifiedAt: {
+    type: Date,
+    default: null,
+  },
+  notes: {
+    type: String,
+    default: '',
+  },
+},
+// ADMIN SIDE ONLY FIELDS
+
+
     // Add these fields to salonSchema
     closureHistory: [
       {
