@@ -199,22 +199,40 @@ const salonSchema = new mongoose.Schema(
     },
 
     // ADMIN SIDE ONLY FIELDS
-verificationMeta: {
-  verifiedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null,
-  },
-  verifiedAt: {
-    type: Date,
-    default: null,
-  },
-  notes: {
-    type: String,
-    default: '',
-  },
-},
-// ADMIN SIDE ONLY FIELDS
+    verificationMeta: {
+      verifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+      verifiedAt: {
+        type: Date,
+        default: null,
+      },
+      notes: {
+        type: String,
+        default: '',
+      },
+    },
+    // Add these fields to your existing salonSchema (around line 180, after staffSystemEnabled)
+
+    // ✅ NEW: Priority system tracking
+    priorityLimitPerDay: {
+      type: Number,
+      default: 5,
+      min: 0,
+      max: 20,
+    },
+    priorityUsedToday: {
+      type: Number,
+      default: 0,
+    },
+    lastPriorityReset: {
+      type: Date,
+      default: Date.now,
+    },
+
+    // ADMIN SIDE ONLY FIELDS
 
 
     // Add these fields to salonSchema
@@ -252,6 +270,28 @@ salonSchema.index({ name: 'text', 'location.city': 'text' });
 // Add index for active salons
 salonSchema.index({ isActive: 1, isOpen: 1 });
 
+
+// ✅ ADD: Reset priority count daily (call this on each priority check)
+salonSchema.methods.resetPriorityIfNeeded = async function() {
+  const now = new Date();
+  const lastReset = new Date(this.lastPriorityReset);
+  
+  // Check if it's a new day (compare dates only, ignore time)
+  const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const lastResetDate = new Date(lastReset.getFullYear(), lastReset.getMonth(), lastReset.getDate());
+  
+  if (nowDate > lastResetDate) {
+    this.priorityUsedToday = 0;
+    this.lastPriorityReset = now;
+    await this.save();
+    console.log(`✅ Priority count reset for salon ${this._id}`);
+    return true;
+  }
+  return false;
+};
+
+
 // module.exports = mongoose.model('Salon', salonSchema);
 
 module.exports = mongoose.model('Salon', salonSchema);
+

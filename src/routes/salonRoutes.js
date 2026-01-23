@@ -19,6 +19,7 @@ const {
   addService,
   updateService,
   deleteService,
+  getPriorityCount,
 } = require('../controllers/salonController');
 const { getDashboardStats } = require('../controllers/dashboardController');
 const { protect } = require('../middleware/auth');
@@ -47,6 +48,14 @@ router.put('/:id/toggle-phone-change', protect, togglePhoneChangePermission);
 router.get('/:id/queue-status', protect, getQueueStatusForClosure);
 router.put('/:id/close-with-reason', protect, closeSalonWithReason);
 router.put('/:id/set-busy-mode', protect, setBusyMode);
+
+router.get(
+  '/:salonId/priority-count-today',
+  protect,
+  requireRole(['owner', 'manager']),
+  requireSalonAccess('salonId'),
+  getPriorityCount
+);
 
 
 // Service management routes

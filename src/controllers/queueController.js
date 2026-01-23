@@ -811,18 +811,274 @@ async function _reorderQueuePositions(salonId) {
   console.log(`🔄 Queue reordered for salon ${salonId}: ${activeBookings.length} positions`);
 }
 
-// Priority insertion (placeholder)
-exports.getPriorityInsertionLimit = async (req, res) => {
-  res.status(200).json({
-    success: true,
-    dailyLimit: 5,
-    used: 0,
-  });
+// ✅ REPLACE THE PLACEHOLDER FUNCTIONS WITH THESE:
+
+// @desc    Get today's priority usage count
+// @route   GET /api/salons/:salonId/priority-count-today
+// @access  Private (Owner/Manager)
+exports.getPriorityCount = async (req, res) => {
+  try {
+    const { salonId } = req.params;
+
+    const salon = await Salon.findById(salonId);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Reset if needed
+    await salon.resetPriorityIfNeeded();
+
+    res.status(200).json({
+      success: true,
+      usedToday: salon.priorityUsedToday,
+      dailyLimit: salon.priorityLimitPerDay,
+      remaining: salon.priorityLimitPerDay - salon.priorityUsedToday,
+      canUse: salon.priorityUsedToday < salon.priorityLimitPerDay,
+    });
+  } catch (error) {
+    console.error('❌ Get priority count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch priority count',
+      error: error.message,
+    });
+  }
 };
 
-exports.insertPriorityCustomer = async (req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Priority insertion not yet implemented',
-  });
+// @desc    Start service as priority
+// @route   POST /api/queue/:salonId/start-priority/:bookingId
+// @access  Private (Owner/Manager ONLY)
+exports.startPriorityService = async (req, res) => {
+  try {
+    const { salonId, bookingId } = req.params;
+    const { reason, assignedStaffId } = req.body;
+
+    console.log('⚡ Priority start request:');
+    console.log('   Salon:', salonId);
+    console.log('   Booking:', bookingId);
+    console.log('   Reason:', reason);
+    console.log('   User:', req.user._id);
+    console.log('   Role:', req.user.role);
+
+    // ✅ VALIDATION 1: Check reason
+    const validReasons = ['Senior citizen', 'Medical urgency', 'Child', 'System exception'];
+    if (!reason || !validReasons.includes(reason)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid reason is required',
+        validReasons,
+      });
+    }
+
+    // ✅ VALIDATION 2: Check role (STRICT)
+    if (req.user.role !== 'owner' && req.userSalonRole !== 'manager') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only owners and managers can use priority service',
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
+
+    // ✅ VALIDATION 3: Get salon and check priority limit
+    const salon = await Salon.findById(salonId);
+    
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Reset count if new day
+    await salon.resetPriorityIfNeeded();
+
+    if (salon.priorityUsedToday >= salon.priorityLimitPerDay) {
+      return res.status(400).json({
+        success: false,
+        message: `Daily priority limit reached (${salon.priorityLimitPerDay}/${salon.priorityLimitPerDay})`,
+        code: 'PRIORITY_LIMIT_REACHED',
+      });
+    }
+
+    // ✅ VALIDATION 4: Check booking exists
+    const booking = await Booking.findOne({ _id: bookingId, salonId })
+      .populate('userId', 'name phone fcmToken');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found',
+      });
+    }
+
+    if (booking.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot start priority - booking is ${booking.status}`,
+      });
+    }
+
+    // ✅ VALIDATION 5: Check barber availability
+    const inProgressCount = await Booking.countDocuments({
+      salonId,
+      status: 'in-progress',
+    });
+
+    const activeBarbers = salon.activeBarbers || 1;
+
+    if (inProgressCount >= activeBarbers) {
+      return res.status(400).json({
+        success: false,
+        message: 'No barbers available. All staff are currently busy.',
+        code: 'NO_BARBERS_AVAILABLE',
+        inProgress: inProgressCount,
+        maxBarbers: activeBarbers,
+      });
+    }
+
+    // ✅ VALIDATION 6: Validate staff if provided
+    if (assignedStaffId) {
+      const Staff = require('../models/Staff');
+      const staff = await Staff.findOne({
+        _id: assignedStaffId,
+        salonId: salonId,
+        isActive: true,
+      });
+
+      if (!staff) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or inactive staff member',
+        });
+      }
+
+      // Check if staff is busy
+      const staffBusy = await Booking.findOne({
+        assignedStaffId: assignedStaffId,
+        status: 'in-progress',
+      });
+
+      if (staffBusy) {
+        return res.status(400).json({
+          success: false,
+          message: `${staff.name} is currently busy`,
+        });
+      }
+
+      booking.assignedStaffId = assignedStaffId;
+    }
+
+    // ✅ EXECUTE: Start service as priority
+    const originalPosition = booking.queuePosition;
+    
+    booking.status = 'in-progress';
+    booking.startedAt = new Date();
+    booking.notes = booking.notes 
+      ? `${booking.notes} | Priority: ${reason}` 
+      : `Priority: ${reason}`;
+    
+    await booking.save();
+
+    // ✅ INCREMENT: Priority usage count
+    salon.priorityUsedToday += 1;
+    await salon.save();
+
+    // ✅ AUDIT LOG: Record priority action (IMMUTABLE)
+    const PriorityLog = require('../models/PriorityLog');
+    const Staff = require('../models/Staff');
+    
+    let assignedStaffName = null;
+    if (assignedStaffId) {
+      const staff = await Staff.findById(assignedStaffId);
+      assignedStaffName = staff ? staff.name : null;
+    }
+
+    await PriorityLog.create({
+      salonId: salonId,
+      bookingId: bookingId,
+      customerId: booking.userId?._id || null,
+      customerName: booking.userId?.name || `Token #${booking.walkInToken}` || 'Walk-in',
+      triggeredBy: req.user._id,
+      triggeredByName: req.user.name || 'Manager',
+      triggeredByRole: req.user.role === 'owner' ? 'owner' : 'manager',
+      reason: reason,
+      queuePositionBefore: originalPosition,
+      assignedStaffId: assignedStaffId || null,
+      assignedStaffName: assignedStaffName,
+    });
+
+    console.log(`⚡ Priority service started for booking ${bookingId}`);
+    console.log(`   Reason: ${reason}`);
+    console.log(`   Original position: ${originalPosition}`);
+    console.log(`   Priority used: ${salon.priorityUsedToday}/${salon.priorityLimitPerDay}`);
+
+    // ✅ SOCKET: Emit queue update
+    if (global.io) {
+      global.io.to(`salon_${salonId}`).emit('queue_updated', {
+        action: 'priority_started',
+        bookingId: booking._id.toString(),
+        salonId: salonId.toString(),
+      });
+
+      // Notify customer
+      if (booking.userId && booking.userId.fcmToken) {
+        global.io.to(`user_${booking.userId._id}`).emit('service_started', {
+          bookingId: booking._id.toString(),
+          priority: true,
+          reason: reason,
+        });
+      }
+
+      // Notify assigned staff
+      if (assignedStaffId) {
+        global.io.to(`staff_${assignedStaffId}`).emit('booking_assigned', {
+          bookingId: booking._id.toString(),
+          priority: true,
+        });
+      }
+    }
+
+    // ✅ NOTIFICATION: Send to customer
+    const NotificationService = require('../services/notificationService');
+    if (booking.userId && booking.userId.fcmToken) {
+      await NotificationService.notifyPriorityStarted(
+        booking.userId,
+        booking,
+        salon,
+        reason
+      );
+    }
+
+    // Emit wait time update
+    const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+    await emitWaitTimeUpdate(salonId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Priority service started successfully',
+      booking: {
+        _id: booking._id,
+        status: booking.status,
+        startedAt: booking.startedAt,
+        priorityReason: reason,
+        originalPosition: originalPosition,
+      },
+      priorityUsage: {
+        used: salon.priorityUsedToday,
+        limit: salon.priorityLimitPerDay,
+        remaining: salon.priorityLimitPerDay - salon.priorityUsedToday,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Start priority service error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to start priority service',
+      error: error.message,
+    });
+  }
 };

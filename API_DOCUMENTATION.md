@@ -5296,3 +5296,5 @@ This documentation should be updated whenever:
 **Pages:** Complete API Reference
 
 This documentation is a living document and should be updated as the API evolves. For questions or clarifications, please contact the development team.
+
+❌ Firebase verification failed: Firebase ID token has incorrect "aud" (audience) claim. Expected "lynin-app" but got "trimzo-app". Make sure the ID token comes from the same Firebase project as the service account used to authenticate this SDK. See https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how to retrieve an ID token.

@@ -125,6 +125,27 @@ class NotificationService {
     });
   }
 
+  // Add this method to the NotificationService class (around line 140)
+
+// ✅ NEW: Priority service started notification
+static async notifyPriorityStarted(user, booking, salon, reason) {
+  if (!user.fcmToken) return;
+
+  await this.sendToDevice(user.fcmToken, {
+    title: '⚡ Priority Service Started',
+    body: `Your service at ${salon.name} has started as priority (${reason})`,
+    data: {
+      type: 'priority_started',
+      bookingId: booking._id.toString(),
+      salonId: salon._id.toString(),
+      reason: reason,
+    },
+  });
+
+  console.log(`✅ Priority notification sent to user ${user._id}`);
+}
+
+
   // Booking completed notification
   static async notifyBookingCompleted(user, booking, salon) {
     if (!user.fcmToken) return;

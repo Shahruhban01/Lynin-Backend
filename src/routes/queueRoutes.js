@@ -14,6 +14,8 @@ const {
   cancelBooking,
   getPriorityInsertionLimit,
   insertPriorityCustomer,
+    startPriorityService,
+  getPriorityCount,    
 } = require('../controllers/queueController');
 
 // All routes require authentication
@@ -51,6 +53,14 @@ router.post(
   startService
 );
 
+// ✅ NEW: Start service as priority
+router.post(
+  '/:salonId/start-priority/:bookingId',
+  requireRole(['owner', 'manager']),
+  requireSalonAccess('salonId'),
+  startPriorityService
+);
+
 // Complete service
 router.post(
   '/:salonId/complete/:bookingId',
@@ -83,19 +93,19 @@ router.post(
   cancelBooking
 );
 
-// Priority insertion
-router.get(
-  '/:salonId/priority-limit',
-  requireRole(['owner', 'manager']),
-  requireSalonAccess('salonId'),
-  getPriorityInsertionLimit
-);
+// // Priority insertion
+// router.get(
+//   '/:salonId/priority-limit',
+//   requireRole(['owner', 'manager']),
+//   requireSalonAccess('salonId'),
+//   getPriorityInsertionLimit
+// );
 
-router.post(
-  '/:salonId/priority-insert',
-  requireRole(['owner', 'manager']),
-  requireSalonAccess('salonId'),
-  insertPriorityCustomer
-);
+// router.post(
+//   '/:salonId/priority-insert',
+//   requireRole(['owner', 'manager']),
+//   requireSalonAccess('salonId'),
+//   insertPriorityCustomer
+// );
 
 module.exports = router;

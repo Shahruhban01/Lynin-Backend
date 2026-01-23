@@ -1362,3 +1362,42 @@ exports.deleteService = async (req, res) => {
 };
 
 // Service Controller Ends
+
+// Add this function to controllers/salonController.js
+
+// @desc    Get today's priority usage count
+// @route   GET /api/salons/:salonId/priority-count-today
+// @access  Private (Owner/Manager)
+exports.getPriorityCount = async (req, res) => {
+  try {
+    const { salonId } = req.params;
+
+    const Salon = require('../models/Salon');
+    const salon = await Salon.findById(salonId);
+
+    if (!salon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Salon not found',
+      });
+    }
+
+    // Reset if needed
+    await salon.resetPriorityIfNeeded();
+
+    res.status(200).json({
+      success: true,
+      usedToday: salon.priorityUsedToday,
+      dailyLimit: salon.priorityLimitPerDay,
+      remaining: salon.priorityLimitPerDay - salon.priorityUsedToday,
+      canUse: salon.priorityUsedToday < salon.priorityLimitPerDay,
+    });
+  } catch (error) {
+    console.error('❌ Get priority count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch priority count',
+      error: error.message,
+    });
+  }
+};

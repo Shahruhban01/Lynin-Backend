@@ -133,20 +133,44 @@ exports.joinQueue = async (req, res) => {
       estimatedStartTime.getTime() + totalDuration * 60000
     );
 
-    // Create booking
+    // // Create booking
+    // const booking = await Booking.create({
+    //   userId,
+    //   salonId,
+    //   services: bookingServices,
+    //   totalPrice,
+    //   totalDuration,
+    //   queuePosition,
+    //   estimatedStartTime,
+    //   estimatedEndTime,
+    //   notes: notes || '',
+    //   paymentMethod, // ADD THIS
+    //   paymentStatus: paymentMethod === 'cash' ? 'pending' : 'pending', // Cash is paid at salon
+    // });
+
     const booking = await Booking.create({
       userId,
       salonId,
+
+      // 🔑 QUEUE SEMANTICS
+      // bookingType: 'immediate',
+      // arrived: true,
+      // arrivedAt: new Date(),
+      joinedAt: new Date(),
+
       services: bookingServices,
       totalPrice,
       totalDuration,
       queuePosition,
       estimatedStartTime,
       estimatedEndTime,
+
+      status: 'pending',
       notes: notes || '',
-      paymentMethod, // ADD THIS
-      paymentStatus: paymentMethod === 'cash' ? 'pending' : 'pending', // Cash is paid at salon
+      paymentMethod,
+      paymentStatus: paymentMethod === 'cash' ? 'pending' : 'pending',
     });
+
 
     // Populate references
     await booking.populate('salonId', 'name location phone');
@@ -935,7 +959,13 @@ exports.getSalonBookings = async (req, res) => {
     }
 
     if (bookingType) {
-      query.bookingType = bookingType;
+      // query.bookingType = bookingType;
+      // 🔥 QUEUE RULE ENFORCEMENT
+      query.$or = [
+        { bookingType: 'immediate' },
+        { bookingType: 'scheduled', arrived: true },
+      ];
+
     }
 
     if (startDate && endDate) {

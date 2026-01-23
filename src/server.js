@@ -53,6 +53,19 @@ ReminderService.startScheduler();
 // Middleware
 app.use(cors());
 app.use(express.json());
+// app.use((req, res, next) => {
+//   const authHeader = req.headers.authorization;
+
+//   if (authHeader) {
+//     const token = authHeader.split(' ')[1];
+//     console.log('🔐 JWT RECEIVED:', token);
+//   } else {
+//     console.log('❌ No Authorization header');
+//   }
+
+//   next();
+// });
+
 app.use(express.urlencoded({ extended: true }));
 
 // Debug middleware (only in development)
