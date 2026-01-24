@@ -1,5300 +1,4857 @@
-# Complete API Documentation - Salon Booking Platform
+# 📘 **LYNIN BACKEND API - COMPLETE DOCUMENTATION**
 
-**Version:** 1.0  
-**Last Updated:** December 12, 2025  
-**Base URL:** `https://api.trimzo.com/api` (Production) | `http://localhost:5000/api` (Development)
-
-***
-
-## Table of Contents
-
-1. [Project Overview](#project-overview)
-2. [Architecture & Folder Structure](#architecture--folder-structure)
-3. [Authentication & Authorization](#authentication--authorization)
-4. [Global Headers & Response Format](#global-headers--response-format)
-5. [Error Handling Standards](#error-handling-standards)
-6. [API Endpoints](#api-endpoints)
-   - [Authentication APIs](#authentication-apis)
-   - [User APIs](#user-apis)
-   - [Salon APIs](#salon-apis)
-   - [Booking APIs](#booking-apis)
-   - [Review APIs](#review-apis)
-   - [Favorite APIs](#favorite-apis)
-   - [Analytics APIs](#analytics-apis)
-   - [Admin APIs](#admin-apis)
-7. [Complete Workflow Examples](#complete-workflow-examples)
-8. [Rate Limiting & Security](#rate-limiting--security)
-9. [Frontend Integration Guide](#frontend-integration-guide)
-10. [Future Improvements](#future-improvements)
+**Version:** 2.0  
+**Last Updated:** January 24, 2026  
+**Base URL:** `http://100.112.160.11:3000/api` (Development)  
+**Environment:** Node.js + Express.js + MongoDB + Socket.IO + Firebase
 
 ***
 
-## Project Overview
+## **🎯 TABLE OF CONTENTS**
 
-### Domain
-Salon booking and queue management platform connecting users with nearby salons, providing real-time wait times, booking management, and analytics.
-
-### Technology Stack
-- **Backend:** Node.js, Express.js
-- **Database:** MongoDB with Mongoose ODM
-- **Authentication:** JWT (JSON Web Tokens)
-- **File Storage:** Cloudinary (for images)
-- **Location Services:** MongoDB Geospatial Queries
-- **Frontend:** Flutter (mobile app)
-
-### Core Features
-1. User authentication (phone/email with OTP)
-2. Location-based salon discovery
-3. Real-time wait time calculation
-4. Booking lifecycle management
-5. Queue position tracking
-6. Reviews and ratings system
-7. Salon owner dashboard and analytics
-8. Admin panel for platform management
-9. Favorites/wishlist functionality
+1. [System Architecture](#1-system-architecture)
+2. [Authentication & Authorization](#2-authentication--authorization)
+3. [Data Models](#3-data-models)
+4. [API Endpoints](#4-api-endpoints)
+   - [Authentication APIs](#41-authentication-apis)
+   - [User Profile APIs](#42-user-profile-apis)
+   - [Salon APIs](#43-salon-apis)
+   - [Booking & Queue APIs](#44-booking--queue-apis)
+   - [Scheduled Booking APIs](#45-scheduled-booking-apis)
+   - [Staff Management APIs](#46-staff-management-apis)
+   - [Dashboard & Reports APIs](#47-dashboard--reports-apis)
+   - [Review APIs](#48-review-apis)
+   - [Favorites APIs](#49-favorites-apis)
+   - [Analytics APIs](#410-analytics-apis)
+   - [Admin APIs](#411-admin-apis)
+   - [FAQ APIs](#412-faq-apis)
+   - [Feature Flags & App Info APIs](#413-feature-flags--app-info-apis)
+5. [Real-Time Features (Socket.IO)](#5-real-time-features-socketio)
+6. [Services & Business Logic](#6-services--business-logic)
+7. [Error Handling](#7-error-handling)
+8. [Complete Workflows](#8-complete-workflows)
 
 ***
 
-## Architecture & Folder Structure
+## **1. SYSTEM ARCHITECTURE**
+
+### **1.1 Technology Stack**
 
 ```
-backend/
+Backend Framework: Express.js (Node.js)
+Database: MongoDB (Mongoose ODM)
+Authentication: Firebase Admin SDK + JWT
+Real-time: Socket.IO
+Push Notifications: Firebase Cloud Messaging (FCM)
+File Storage: Firebase Storage (implied)
+Geolocation: MongoDB 2dsphere indexes
+```
+
+### **1.2 Project Structure**
+
+```
+lynin-backend/
+├── server.js                    # Main entry point
 ├── config/
-│   ├── db.js                    # MongoDB connection configuration
-│   └── cloudinary.js            # Cloudinary setup for image uploads
-├── middleware/
-│   ├── auth.js                  # JWT verification middleware
-│   ├── roleCheck.js             # Role-based access control
-│   ├── upload.js                # Multer configuration for file uploads
-│   └── errorHandler.js          # Global error handling middleware
+│   ├── database.js              # MongoDB connection
+│   └── firebase.js              # Firebase Admin SDK
 ├── models/
-│   ├── User.js                  # User schema (customers)
-│   ├── Salon.js                 # Salon schema with location
-│   ├── Booking.js               # Booking/Queue schema
-│   ├── Review.js                # Review and rating schema
-│   ├── Service.js               # Service offerings schema
-│   └── Admin.js                 # Admin user schema
+│   ├── User.js                  # User schema (customer/owner/admin/staff/manager)
+│   ├── Salon.js                 # Salon schema with geospatial data
+│   ├── Booking.js               # Booking/Queue management
+│   ├── Staff.js                 # Staff member profiles
+│   ├── AdminAuditLog.js         # Admin activity tracking
+│   ├── PriorityLog.js           # Priority queue logs
+│   ├── FAQ.js                   # Help center FAQs
+│   ├── FeatureFlag.js           # Feature toggles (live chat)
+│   └── AppInfo.js               # App metadata
 ├── controllers/
 │   ├── authController.js        # Authentication logic
-│   ├── userController.js        # User profile management
-│   ├── salonController.js       # Salon CRUD and discovery
+│   ├── adminAuthController.js   # Admin authentication
+│   ├── adminController.js       # Admin operations
+│   ├── salonController.js       # Salon CRUD & discovery
 │   ├── bookingController.js     # Booking lifecycle
-│   ├── reviewController.js      # Review management
-│   ├── analyticsController.js   # Analytics and reports
-│   └── adminController.js       # Admin operations
+│   ├── queueController.js       # Live queue management
+│   ├── scheduledBookingController.js # Scheduled bookings
+│   ├── staffController.js       # Staff management
+│   ├── salonSetupController.js  # Onboarding wizard
+│   ├── dashboardController.js   # Dashboard stats
+│   ├── reviewController.js      # Reviews & ratings
+│   ├── favoriteController.js    # Favorites/wishlist
+│   ├── analyticsController.js   # Analytics & reports
+│   ├── reportsController.js     # Advanced reporting
+│   ├── faqController.js         # FAQ management
+│   ├── featureFlagController.js # Feature flags
+│   └── appInfoController.js     # App info management
 ├── routes/
-│   ├── auth.js                  # Auth routes
-│   ├── user.js                  # User routes
-│   ├── salon.js                 # Salon routes
-│   ├── booking.js               # Booking routes
-│   ├── review.js                # Review routes
-│   └── admin.js                 # Admin routes
-├── utils/
-│   ├── calculateWaitTime.js     # Wait time calculation logic
-│   ├── sendOTP.js               # OTP generation and sending
-│   ├── validators.js            # Input validation helpers
-│   └── logger.js                # Logging utility
-├── .env                         # Environment variables
-├── server.js                    # Express app entry point
-└── package.json                 # Dependencies
+│   ├── authRoutes.js
+│   ├── adminAuthRoutes.js
+│   ├── adminRoutes.js
+│   ├── salonRoutes.js
+│   ├── bookingRoutes.js
+│   ├── queueRoutes.js
+│   ├── scheduledBookingRoutes.js
+│   ├── staffRoutes.js (staff.js)
+│   ├── salonSetupRoutes.js
+│   ├── dashboardRoutes.js
+│   ├── reviewRoutes.js
+│   ├── favoriteRoutes.js
+│   ├── analyticsRoutes.js
+│   ├── reports.js
+│   ├── faqs.js
+│   ├── featureFlags.js
+│   └── appInfo.js
+├── middleware/
+│   ├── auth.js                  # JWT verification & admin checks
+│   └── roleCheck.js             # Role-based access control
+├── services/
+│   ├── notificationService.js   # FCM push notifications
+│   ├── reminderService.js       # Scheduled reminders
+│   └── waitTimeService.js       # Wait time calculations
+└── utils/
+    └── waitTimeHelpers.js       # Wait time broadcasting
 ```
+
+### **1.3 Core Features**
+
+1. **Multi-Role System:** Customer, Owner, Manager, Staff, Admin
+2. **Real-Time Queue Management:** Live wait times, Socket.IO updates
+3. **Dual Booking System:** Immediate (walk-in) + Scheduled bookings
+4. **Staff Management:** Assign staff to bookings, track performance
+5. **Priority Queue System:** Senior citizens, medical urgency, children
+6. **Walk-In Token System:** 4-digit tokens for anonymous customers
+7. **Loyalty Points:** 1 point per ₹10 spent
+8. **Geospatial Search:** Find salons by coordinates + radius
+9. **Admin Panel:** Platform statistics, user/salon management, audit logs
+10. **Push Notifications:** Booking updates, queue position changes
+11. **Dynamic Wait Time Calculation:** Personalized per user
+12. **Salon Setup Wizard:** 4-step onboarding (Profile → Hours → Services → Capacity)
 
 ***
 
-## Authentication & Authorization
+## **2. AUTHENTICATION & AUTHORIZATION**
 
-### Authentication Flow
+### **2.1 Authentication Flow**
 
 ```
-1. User Registration/Login
-   ├─> POST /api/auth/register or /api/auth/login
-   ├─> Backend validates credentials
-   ├─> OTP sent to phone/email (if required)
-   ├─> User verifies OTP via POST /api/auth/verify-otp
-   ├─> JWT token generated and returned
-   └─> Token includes: { userId, role, exp }
-
-2. Protected Route Access
-   ├─> Client includes token in Authorization header
-   ├─> auth.js middleware verifies JWT
-   ├─> Decoded user attached to req.user
-   ├─> roleCheck.js middleware validates role (if applicable)
-   └─> Controller processes request
-
-3. Token Refresh
-   ├─> Token expires after 30 days (default)
-   ├─> Client must re-authenticate
-   └─> No refresh token implemented (stateless JWT)
+┌─────────────┐
+│ Client App │
+└──────┬──────┘
+       │
+       │ 1. Firebase Phone Auth (OTP)
+       ▼
+┌─────────────────┐
+│ Firebase Auth   │
+│ (idToken)       │
+└──────┬──────────┘
+       │
+       │ 2. POST /api/auth/verify-token
+       │    { idToken, phone, appType }
+       ▼
+┌─────────────────────┐
+│ Backend verifies    │
+│ Firebase token      │
+│ ├─ New user → Create│
+│ └─ Existing → Link  │
+└──────┬──────────────┘
+       │
+       │ 3. Returns JWT + User
+       ▼
+┌─────────────────────┐
+│ Client stores JWT   │
+│ in secure storage   │
+└─────────────────────┘
+       │
+       │ 4. All subsequent requests
+       │    Authorization: Bearer <JWT>
+       ▼
+┌─────────────────────┐
+│ Middleware verifies │
+│ JWT → req.user      │
+└─────────────────────┘
 ```
 
-### JWT Payload Structure
+### **2.2 Roles & Permissions**
+
+| Role | Description | Key Permissions |
+|------|-------------|-----------------|
+| **customer** | Regular app users | Book salons, write reviews, manage profile, view favorites  [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt) |
+| **owner** | Salon owners | Manage salon(s), view analytics, manage queue, add walk-ins, complete setup wizard  [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt) |
+| **manager** | Salon managers | Manage queue, handle bookings, cannot edit salon profile  [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt) |
+| **staff** | Salon staff/barbers | View queue, start/complete services (limited permissions)  [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt) |
+| **admin** | Platform admins | Full platform access, user/salon management, audit logs  [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt) |
+
+### **2.3 JWT Structure**
+
+```javascript
+// JWT Payload
+{
+  "userId": "60d5f484f1b2c72d88f8a1b2",
+  "phone": "+919876543210",
+  "role": "customer|owner|manager|staff|admin",
+  "isAdmin": true,  // Only for admin role
+  "iat": 1737698400,
+  "exp": 1740376800  // 30 days
+}
+```
+
+### **2.4 Firebase Integration**
+
+The backend uses **Firebase Admin SDK** to verify Firebase Authentication tokens: [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+1. Client authenticates with Firebase (phone OTP)
+2. Client sends Firebase `idToken` to backend
+3. Backend verifies token using `admin.auth().verifyIdToken()`
+4. Backend creates/updates user in MongoDB
+5. Backend generates JWT for subsequent requests
+
+***
+
+## **3. DATA MODELS**
+
+### **3.1 User Model**
 
 ```javascript
 {
-  "userId": "507f1f77bcf86cd799439011",
-  "role": "user|owner|admin",
-  "iat": 1670859678,        // Issued at timestamp
-  "exp": 1673451678         // Expiration timestamp
+  phone: String (required, unique, indexed),
+  name: String (nullable),
+  email: String (nullable, unique if set),
+  firebaseUid: String (required, unique, indexed),
+  profileImage: String (URL),
+  fcmToken: String (for push notifications),
+  
+  // Role system
+  role: Enum ['customer', 'owner', 'manager', 'staff', 'admin'] (default: 'customer'),
+  salonId: ObjectId (ref: Salon, for owner/manager/staff),
+  permissions: [String] (for granular access control),
+  
+  // Salon owner setup tracking
+  setupCompleted: Boolean (default: false),
+  setupStep: Enum ['profile', 'hours', 'services', 'capacity', 'completed'],
+  
+  // Customer-specific
+  favoriteSalons: [ObjectId] (ref: Salon),
+  loyaltyPoints: Number (default: 0),
+  totalBookings: Number (default: 0),
+  
+  // Metadata
+  lastLogin: Date,
+  isActive: Boolean (default: true),
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 
-### Role-Based Access Control
 
-| Role | Description | Access Level |
-|------|-------------|--------------|
-| `user` | Regular app users (customers) | Can book salons, write reviews, manage profile |
-| `owner` | Salon owners | Can manage own salon(s), view analytics, manage bookings |
-| `admin` | Platform administrators | Full access to all resources, can manage users and salons |
+### **3.2 Salon Model**
 
-### Access Control Matrix
-
-| Resource | Public | User | Owner | Admin |
-|----------|--------|------|-------|-------|
-| Register/Login | ✅ | ✅ | ✅ | ✅ |
-| View Salons | ✅ | ✅ | ✅ | ✅ |
-| View Salon Details | ✅ | ✅ | ✅ | ✅ |
-| Create Booking | ❌ | ✅ | ❌ | ✅ |
-| Manage Own Bookings | ❌ | ✅ | ❌ | ✅ |
-| Create Review | ❌ | ✅ | ❌ | ✅ |
-| Create Salon | ❌ | ❌ | ✅ | ✅ |
-| Update Salon | ❌ | ❌ | ✅ (own) | ✅ |
-| View Analytics | ❌ | ❌ | ✅ (own) | ✅ |
-| Manage Queue | ❌ | ❌ | ✅ (own) | ✅ |
-| Delete Users | ❌ | ❌ | ❌ | ✅ |
-| Platform Analytics | ❌ | ❌ | ❌ | ✅ |
-
-***
-
-## Global Headers & Response Format
-
-### Standard Request Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <JWT_TOKEN>          # For protected routes
-X-Client-Version: 1.0.0                    # Optional: Client app version
-X-Platform: ios|android                    # Optional: Platform identifier
-```
-
-### Standard Success Response Format
-
-```json
+```javascript
 {
-  "success": true,
-  "message": "Operation successful",
-  "data": {
-    // Response payload specific to endpoint
+  name: String (required),
+  description: String,
+  
+  // Location (geospatial)
+  location: {
+    type: 'Point',
+    coordinates: [longitude, latitude] (required, 2dsphere indexed),
+    address: String (required),
+    city: String (required),
+    state: String (required),
+    pincode: String (required)
   },
-  "timestamp": "2025-12-12T23:55:00.000Z"
-}
-```
-
-### Standard Error Response Format
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message",
-    "details": [
-      // Optional array of validation errors or additional info
-    ]
+  
+  // Contact
+  phone: String (required),
+  email: String,
+  
+  // Operating hours
+  hours: {
+    monday: { open: '09:00', close: '21:00', closed: Boolean },
+    tuesday: { open: '09:00', close: '21:00', closed: Boolean },
+    // ... all 7 days
   },
-  "timestamp": "2025-12-12T23:55:00.000Z"
+  
+  // Services with categories
+  services: [{
+    name: String,
+    price: Number,
+    duration: Number (minutes),
+    description: String,
+    category: Enum ['Hair', 'Beard', 'Body', 'Add-on'],
+    isPrimary: Boolean,
+    isUpsell: Boolean
+  }],
+  
+  // Images
+  profileImage: String,
+  images: [String],
+  
+  // Ratings
+  averageRating: Number (0-5),
+  totalReviews: Number,
+  
+  // Queue management
+  isOpen: Boolean (default: true),
+  currentQueueSize: Number (default: 0),
+  avgServiceTime: Number (default: 30),
+  type: Enum ['men', 'women', 'unisex', null],
+  
+  // Capacity settings
+  totalBarbers: Number (required, min: 1, default: 1),
+  activeBarbers: Number (default: 1, max: totalBarbers),
+  averageServiceDuration: Number (default: 30),
+  busyMode: Boolean (default: false),
+  maxQueueSize: Number (default: 20),
+  
+  // Account settings
+  operatingMode: Enum ['normal', 'busy', 'closed'],
+  autoAcceptBookings: Boolean (default: true),
+  notificationPreferences: {
+    newBookings: Boolean,
+    queueUpdates: Boolean,
+    customerMessages: Boolean,
+    promotions: Boolean,
+    pushEnabled: Boolean
+  },
+  
+  // Priority system
+  priorityLimitPerDay: Number (default: 5, max: 20),
+  priorityUsedToday: Number (default: 0),
+  lastPriorityReset: Date,
+  
+  // Closure tracking
+  closureHistory: [{
+    closedAt: Date,
+    reason: String,
+    customReason: String,
+    queueSizeAtClosure: Number,
+    reopenedAt: Date
+  }],
+  lastClosureReason: String,
+  
+  // Permissions (admin-controlled)
+  phoneChangeEnabled: Boolean (default: false),
+  staffSystemEnabled: Boolean (default: false),
+  locationEditEnabled: Boolean (default: false),
+  
+  // Admin verification
+  ownerId: ObjectId (ref: User, required),
+  isActive: Boolean (default: true),
+  isVerified: Boolean (default: false),
+  verificationMeta: {
+    verifiedBy: ObjectId (ref: User),
+    verifiedAt: Date,
+    notes: String
+  },
+  
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 
-### Pagination Response Format
 
-```json
+### **3.3 Booking Model**
+
+```javascript
+{
+  // References
+  userId: ObjectId (ref: User, nullable for walk-ins),
+  salonId: ObjectId (ref: Salon, required, indexed),
+  assignedStaffId: ObjectId (ref: Staff, indexed),
+  
+  // Booking type
+  bookingType: Enum ['immediate', 'scheduled'] (default: 'immediate', indexed),
+  scheduledDate: Date (indexed, for scheduled bookings),
+  scheduledTime: String (format: "HH:mm"),
+  
+  // Services
+  services: [{
+    serviceId: String,
+    name: String,
+    price: Number,
+    duration: Number
+  }],
+  totalPrice: Number (required),
+  totalDuration: Number (required),
+  
+  // Payment
+  paymentMethod: Enum ['cash', 'card', 'upi', 'wallet'] (default: 'cash'),
+  paymentStatus: Enum ['pending', 'paid', 'refunded', 'failed'],
+  paidAmount: Number (default: 0),
+  paymentDate: Date,
+  transactionId: String,
+  
+  // Queue management
+  queuePosition: Number (required, indexed),
+  estimatedStartTime: Date,
+  estimatedEndTime: Date,
+  
+  // Check-in system
+  arrived: Boolean (default: false),
+  arrivedAt: Date,
+  walkInToken: String (indexed, 4-digit token for anonymous customers),
+  
+  // Status tracking
+  status: Enum ['pending', 'in-progress', 'completed', 'skipped', 'cancelled', 'no-show'] (indexed),
+  
+  // Skip tracking
+  skippedAt: Date,
+  originalPosition: Number,
+  skipReason: String,
+  
+  // Timestamps
+  joinedAt: Date (default: Date.now),
+  startedAt: Date,
+  completedAt: Date,
+  
+  // Additional info
+  notes: String,
+  staffNotes: String,
+  cancellationReason: String,
+  
+  // Review
+  rating: Number (1-5),
+  review: String,
+  reviewedAt: Date,
+  
+  // Loyalty & notifications
+  loyaltyPointsEarned: Number (default: 0),
+  reminderSent: Boolean (default: false),
+  turnNotificationSent: Boolean (default: false),
+  
+  createdAt: Date,
+  updatedAt: Date
+}
+
+// Compound Indexes
+- { userId, status }
+- { salonId, status }
+- { salonId, queuePosition }
+- { salonId, bookingType, scheduledDate }
+```
+
+
+### **3.4 Staff Model**
+
+```javascript
+{
+  name: String (required),
+  email: String (required, unique),
+  phone: String (required),
+  profileImage: String,
+  firebaseUid: String (unique, sparse),
+  
+  // Salon association
+  salonId: ObjectId (ref: Salon, required, indexed),
+  role: Enum ['barber', 'stylist', 'manager', 'receptionist'],
+  specialization: [String],
+  assignedServices: [ObjectId] (ref to salon.services._id),
+  
+  // Schedule
+  workingHours: {
+    monday: { isWorking: Boolean, start: '09:00', end: '18:00' },
+    // ... all 7 days
+  },
+  
+  // Financials
+  commissionType: Enum ['percentage', 'fixed', 'none'],
+  commissionRate: Number (default: 0),
+  salary: Number (default: 0),
+  
+  // Performance stats
+  stats: {
+    totalBookings: Number,
+    completedBookings: Number,
+    totalRevenue: Number,
+    totalCommission: Number,
+    averageRating: Number (0-5),
+    totalReviews: Number
+  },
+  
+  // Status
+  isActive: Boolean (default: true),
+  isAvailable: Boolean (default: true),
+  
+  joinDate: Date,
+  notes: String,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+
+### **3.5 Additional Models**
+
+**AdminAuditLog:** Tracks all admin actions (user deletion, salon verification, etc.) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**PriorityLog:** Logs priority queue insertions with reason and triggered by [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**FAQ:** Cached FAQs with categories, tags, views, and helpfulness tracking [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**FeatureFlag:** Live chat configuration (Tawk.to script toggle) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**AppInfo:** Cached app metadata (privacy policy URLs, social media links, open-source licenses) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+## **4. API ENDPOINTS**
+
+### **4.1 AUTHENTICATION APIS**
+
+#### **4.1.1 Verify Firebase Token (Customer/Owner Login)**
+
+**Endpoint:** `POST /api/auth/verify-token`  
+**Access:** Public  
+**Description:** Authenticates user via Firebase token, creates/links account, returns JWT [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Request:**
+```javascript
+{
+  "idToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6I...",  // or "firebaseToken"
+  "phone": "+919876543210",                        // optional if in token
+  "appType": "customer"                            // or "salon"
+}
+```
+
+**Response (200):**
+```javascript
 {
   "success": true,
-  "data": [],
-  "pagination": {
-    "currentPage": 1,
-    "totalPages": 10,
-    "totalItems": 95,
-    "itemsPerPage": 10,
-    "hasNextPage": true,
-    "hasPrevPage": false
-  }
-}
-```
-
-***
-
-## Error Handling Standards
-
-### HTTP Status Codes Used
-
-| Status Code | Meaning | Usage |
-|-------------|---------|-------|
-| 200 | OK | Successful GET, PUT, PATCH requests |
-| 201 | Created | Successful POST requests creating new resources |
-| 204 | No Content | Successful DELETE requests |
-| 400 | Bad Request | Validation errors, malformed requests |
-| 401 | Unauthorized | Missing or invalid authentication token |
-| 403 | Forbidden | Valid token but insufficient permissions |
-| 404 | Not Found | Resource does not exist |
-| 409 | Conflict | Resource conflict (e.g., duplicate booking) |
-| 422 | Unprocessable Entity | Business logic validation failure |
-| 429 | Too Many Requests | Rate limit exceeded |
-| 500 | Internal Server Error | Server-side errors |
-| 503 | Service Unavailable | Database or external service down |
-
-### Standard Error Codes
-
-| Error Code | HTTP Status | Description |
-|------------|-------------|-------------|
-| `AUTH_TOKEN_MISSING` | 401 | Authorization header not provided |
-| `AUTH_TOKEN_INVALID` | 401 | JWT token is malformed or expired |
-| `AUTH_INSUFFICIENT_PERMISSIONS` | 403 | User role lacks required permissions |
-| `VALIDATION_ERROR` | 400 | Input validation failed |
-| `RESOURCE_NOT_FOUND` | 404 | Requested resource doesn't exist |
-| `DUPLICATE_RESOURCE` | 409 | Resource already exists |
-| `BUSINESS_LOGIC_ERROR` | 422 | Operation violates business rules |
-| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests from client |
-| `INTERNAL_ERROR` | 500 | Unexpected server error |
-
-***
-
-## API Endpoints
-
-***
-
-## Authentication APIs
-
-### 1. User Registration
-
-**Endpoint:** Register a new user account
-
-**HTTP Method:** `POST`
-
-**Route:** `/api/auth/register`
-
-**Access Level:** Public
-
-**Authentication Required:** No
-
-#### Request Headers
-```http
-Content-Type: application/json
-```
-
-#### Request Body
-```json
-{
-  "name": "John Doe",
-  "email": "john.doe@example.com",
-  "phone": "+919876543210",
-  "password": "SecurePass123!",
-  "role": "user"
-}
-```
-
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| name | String | Yes | Min 2 chars, max 50 chars |
-| email | String | Yes | Valid email format, unique |
-| phone | String | Yes | Valid phone format (+country code), unique |
-| password | String | Yes | Min 8 chars, at least 1 uppercase, 1 lowercase, 1 number |
-| role | String | No | Defaults to "user", accepts "user" or "owner" |
-
-#### Business Logic
-
-1. Validate input data (email format, phone format, password strength)
-2. Check if email or phone already exists in database
-3. Hash password using bcrypt (10 salt rounds)
-4. Create User document in MongoDB
-5. Generate JWT token with userId and role
-6. Optionally send verification OTP to phone/email
-7. Return user object (without password) and token
-
-#### Success Response
-
-**Status Code:** `201 Created`
-
-```json
-{
-  "success": true,
-  "message": "User registered successfully",
-  "data": {
-    "user": {
-      "_id": "507f1f77bcf86cd799439011",
-      "name": "John Doe",
-      "email": "john.doe@example.com",
-      "phone": "+919876543210",
-      "role": "user",
-      "isVerified": false,
-      "createdAt": "2025-12-12T23:55:00.000Z"
-    },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-  }
-}
-```
-
-#### Error Responses
-
-**Duplicate Email (409)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "DUPLICATE_RESOURCE",
-    "message": "Email already registered",
-    "details": ["Email john.doe@example.com is already in use"]
-  }
-}
-```
-
-**Validation Error (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input data",
-    "details": [
-      "Password must be at least 8 characters",
-      "Phone number must include country code"
-    ]
-  }
-}
-```
-
-#### Related Models
-- **User Model:** Creates new document with fields: name, email, phone, password (hashed), role, isVerified, createdAt, updatedAt
-
-#### Frontend Notes
-- **Do NOT** store plain passwords locally
-- Store JWT token securely (Flutter Secure Storage)
-- Handle verification flow if `isVerified: false`
-- Implement password strength indicator
-- Add phone number formatting helper
-
-#### Edge Cases
-- Email exists but not verified → Allow re-registration with new OTP
-- Phone exists with different email → Reject, ask to login
-- Network failure during registration → Implement retry with exponential backoff
-- Weak password → Show specific requirements in error
-
-***
-
-### 2. User Login
-
-**Endpoint:** Authenticate existing user
-
-**HTTP Method:** `POST`
-
-**Route:** `/api/auth/login`
-
-**Access Level:** Public
-
-**Authentication Required:** No
-
-#### Request Body
-```json
-{
-  "identifier": "john.doe@example.com",
-  "password": "SecurePass123!"
-}
-```
-
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| identifier | String | Yes | Email or phone number |
-| password | String | Yes | User's password |
-
-#### Business Logic
-
-1. Accept email OR phone as identifier
-2. Find user by email or phone in database
-3. Compare provided password with hashed password using bcrypt
-4. If match, generate JWT token
-5. Update `lastLogin` timestamp
-6. Return user object and token
-7. If mismatch, return error after 3 failed attempts → temporarily lock account
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "user": {
-      "_id": "507f1f77bcf86cd799439011",
-      "name": "John Doe",
-      "email": "john.doe@example.com",
-      "phone": "+919876543210",
-      "role": "user",
-      "isVerified": true,
-      "profileImage": "https://cloudinary.com/...",
-      "lastLogin": "2025-12-12T23:55:00.000Z"
-    },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-  }
-}
-```
-
-#### Error Responses
-
-**Invalid Credentials (401)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "AUTH_INVALID_CREDENTIALS",
-    "message": "Invalid email or password"
-  }
-}
-```
-
-**Account Locked (403)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "AUTH_ACCOUNT_LOCKED",
-    "message": "Account temporarily locked due to multiple failed login attempts",
-    "details": ["Try again after 15 minutes"]
-  }
-}
-```
-
-#### Security Notes
-- **DO NOT** specify whether email or password is incorrect (prevent user enumeration)
-- Implement rate limiting: max 5 attempts per IP per 15 minutes
-- Log all failed login attempts with IP and timestamp
-- Consider implementing CAPTCHA after 3 failed attempts
-
-***
-
-### 3. Send OTP
-
-**Endpoint:** Send OTP for verification
-
-**HTTP Method:** `POST`
-
-**Route:** `/api/auth/send-otp`
-
-**Access Level:** Public
-
-**Authentication Required:** No
-
-#### Request Body
-```json
-{
-  "phone": "+919876543210",
-  "purpose": "registration"
-}
-```
-
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| phone | String | Yes | Valid phone with country code |
-| purpose | String | Yes | "registration", "login", or "reset_password" |
-
-#### Business Logic
-
-1. Validate phone number format
-2. Check purpose and verify phone eligibility
-   - registration: Phone must NOT exist
-   - login: Phone must exist
-   - reset_password: Phone must exist
-3. Generate 6-digit OTP
-4. Store OTP in database/cache with 5-minute expiry
-5. Send OTP via SMS service (Twilio, AWS SNS, etc.)
-6. Return success (do NOT return OTP in response)
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "OTP sent successfully",
-  "data": {
+  "message": "Authentication successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  // JWT
+  "user": {
+    "_id": "60d5f484f1b2c72d88f8a1b2",
     "phone": "+919876543210",
-    "expiresIn": 300,
-    "canResendAfter": 60
-  }
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "customer",
+    "loyaltyPoints": 150,
+    "salonId": null,
+    "salonName": null
+  },
+  
+  // For salon roles only
+  "setupCompleted": false,
+  "setupStep": "profile",
+  "setupRequired": true  // true if owner with no salon
 }
 ```
 
-#### Error Responses
-
-**Phone Already Registered (409)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "PHONE_ALREADY_REGISTERED",
-    "message": "This phone number is already registered"
-  }
-}
-```
-
-**Too Many Requests (429)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "RATE_LIMIT_EXCEEDED",
-    "message": "Too many OTP requests. Please try again later",
-    "details": ["Retry after 60 seconds"]
-  }
-}
-```
-
-#### Security Notes
-- Rate limit: Max 3 OTP requests per phone per hour
-- Max 5 OTP requests per IP per hour
-- OTP expires in 5 minutes
-- Allow resend only after 60 seconds
-- Log all OTP generation attempts
+**Special Features:**
+- Automatically links walk-in accounts (phone-based) to Firebase UID
+- Sets default role based on `appType` ("customer" app → "customer", "salon" app → "owner")
+- Returns setup status for salon roles [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
 
 ***
 
-### 4. Verify OTP
+#### **4.1.2 Admin Login**
 
-**Endpoint:** Verify OTP code
+**Endpoint:** `POST /api/admin/auth/login`  
+**Access:** Public  
+**Description:** Admin authentication with Firebase token [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**HTTP Method:** `POST`
-
-**Route:** `/api/auth/verify-otp`
-
-**Access Level:** Public
-
-**Authentication Required:** No
-
-#### Request Body
-```json
+**Request:**
+```javascript
 {
-  "phone": "+919876543210",
-  "otp": "123456",
-  "purpose": "registration"
+  "email": "admin@lynin.com",
+  "firebaseToken": "eyJhbGciOiJSUzI1NiIs..."
 }
 ```
 
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| phone | String | Yes | Valid phone number |
-| otp | String | Yes | 6-digit code |
-| purpose | String | Yes | Must match OTP generation purpose |
-
-#### Business Logic
-
-1. Find OTP record by phone and purpose
-2. Check if OTP is expired (5 minutes)
-3. Compare provided OTP with stored OTP
-4. If match:
-   - Mark user as verified (if registration)
-   - Generate JWT token
-   - Delete OTP record
-   - Return token
-5. If mismatch:
-   - Increment failed attempts counter
-   - After 3 failed attempts → invalidate OTP
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "message": "OTP verified successfully",
-  "data": {
-    "verified": true,
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-      "_id": "507f1f77bcf86cd799439011",
-      "phone": "+919876543210",
-      "isVerified": true
-    }
+  "token": "eyJhbGciOiJIUzI1NiIs...",  // JWT with isAdmin: true
+  "user": {
+    "_id": "...",
+    "name": "Admin User",
+    "email": "admin@lynin.com",
+    "phone": "+919876543210",
+    "role": "admin",
+    "profileImage": null
   }
 }
 ```
 
-#### Error Responses
-
-**Invalid OTP (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "OTP_INVALID",
-    "message": "Invalid OTP code",
-    "details": ["2 attempts remaining"]
-  }
-}
-```
-
-**OTP Expired (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "OTP_EXPIRED",
-    "message": "OTP has expired. Please request a new one"
-  }
-}
-```
+**Security:**
+- Verifies email matches Firebase token email
+- Checks `role === 'admin'` and `isActive === true` in database
+- Logs login event to AdminAuditLog [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
 ***
 
-### 5. Refresh Token
+#### **4.1.3 Get Current User Profile**
 
-**Endpoint:** Refresh expired JWT token
+**Endpoint:** `GET /api/auth/me`  
+**Access:** Private (requires JWT)  
+**Description:** Returns current authenticated user's profile [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
 
-**HTTP Method:** `POST`
-
-**Route:** `/api/auth/refresh-token`
-
-**Access Level:** Authenticated
-
-**Authentication Required:** Yes (expired token acceptable)
-
-#### Request Headers
-```http
-Authorization: Bearer <EXPIRED_OR_VALID_JWT_TOKEN>
+**Headers:**
 ```
-
-#### Business Logic
-
-1. Extract token from Authorization header
-2. Decode token (ignore expiration)
-3. Verify user still exists in database
-4. Check if user is not banned/deleted
-5. Generate new JWT token with same payload
-6. Return new token
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Token refreshed successfully",
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "expiresIn": 2592000
-  }
-}
-```
-
-#### Error Responses
-
-**User Not Found (404)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "USER_NOT_FOUND",
-    "message": "User account no longer exists"
-  }
-}
-```
-
-#### Notes
-- **Current Implementation:** Stateless JWT (no refresh token database)
-- **Assumption:** This endpoint accepts both valid and expired tokens for refresh
-- **Future Enhancement:** Implement refresh token rotation with Redis
-
-***
-
-## User APIs
-
-### 6. Get User Profile
-
-**Endpoint:** Retrieve authenticated user's profile
-
-**HTTP Method:** `GET`
-
-**Route:** `/api/users/profile`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-#### Business Logic
-
-1. Extract userId from JWT token (via auth middleware)
-2. Find user in database by userId
-3. Populate related fields (favorites, recent bookings count)
-4. Return user profile (exclude password)
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "data": {
-    "user": {
-      "_id": "507f1f77bcf86cd799439011",
-      "name": "John Doe",
-      "email": "john.doe@example.com",
-      "phone": "+919876543210",
-      "profileImage": "https://cloudinary.com/image.jpg",
-      "role": "user",
-      "isVerified": true,
-      "favoriteCount": 5,
-      "totalBookings": 12,
-      "createdAt": "2025-01-01T00:00:00.000Z",
-      "lastLogin": "2025-12-12T23:55:00.000Z"
-    }
+  "user": {
+    "id": "60d5f484f1b2c72d88f8a1b2",
+    "phone": "+919876543210",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "loyaltyPoints": 150,
+    "createdAt": "2025-01-20T10:30:00.000Z",
+    "lastLogin": "2026-01-24T05:00:00.000Z"
   }
 }
 ```
-
-#### Error Responses
-
-**Token Missing (401)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "AUTH_TOKEN_MISSING",
-    "message": "Authorization token required"
-  }
-}
-```
-
-**User Not Found (404)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "USER_NOT_FOUND",
-    "message": "User profile not found"
-  }
-}
-```
-
-#### Related Models
-- **User Model:** Fetches user document
-- **Booking Model:** Counts total bookings
-- **Favorites (embedded):** Returns favorite salon IDs
 
 ***
 
-### 7. Update User Profile
+#### **4.1.4 Update User Profile**
 
-**Endpoint:** Update user information
+**Endpoint:** `PUT /api/auth/profile`  
+**Access:** Private  
+**Description:** Update name, email, or profile image [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
 
-**HTTP Method:** `PUT`
-
-**Route:** `/api/users/profile`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body
-```json
+**Request:**
+```javascript
 {
-  "name": "John Updated Doe",
-  "email": "newemail@example.com",
-  "phone": "+919999999999",
-  "profileImage": "https://cloudinary.com/new-image.jpg"
+  "name": "John Updated",
+  "email": "john.new@example.com",
+  "profileImage": "https://firebasestorage.googleapis.com/..."
 }
 ```
 
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| name | String | No | Min 2 chars, max 50 chars |
-| email | String | No | Valid email, unique |
-| phone | String | No | Valid phone, unique |
-| profileImage | String | No | Valid URL or base64 |
-
-#### Business Logic
-
-1. Extract userId from JWT token
-2. Validate updated fields
-3. Check if new email/phone is already taken by another user
-4. If phone changed → set `isVerified: false`, send OTP
-5. Update user document
-6. Return updated user profile
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
   "message": "Profile updated successfully",
-  "data": {
-    "user": {
-      "_id": "507f1f77bcf86cd799439011",
-      "name": "John Updated Doe",
-      "email": "newemail@example.com",
-      "phone": "+919999999999",
-      "isVerified": false,
-      "profileImage": "https://cloudinary.com/new-image.jpg"
-    },
-    "requiresVerification": true
+  "user": {
+    "id": "...",
+    "phone": "+919876543210",
+    "name": "John Updated",
+    "email": "john.new@example.com",
+    "profileImage": "https://...",
+    "loyaltyPoints": 150,
+    "createdAt": "...",
+    "lastLogin": "..."
   }
 }
 ```
 
-#### Error Responses
-
-**Email Already Taken (409)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "EMAIL_ALREADY_EXISTS",
-    "message": "Email is already registered to another account"
-  }
-}
-```
-
-#### Notes
-- Changing phone requires re-verification
-- Profile image can be uploaded separately via upload endpoint
-- Email change may trigger confirmation email
+**Validation:**
+- Email format validation
+- Duplicate email check [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
 
 ***
 
-### 8. Upload Profile Image
+#### **4.1.5 Update FCM Token**
 
-**Endpoint:** Upload user profile picture
+**Endpoint:** `PUT /api/auth/fcm-token` or `PUT /api/auth/update-fcm-token`  
+**Access:** Private  
+**Description:** Register device for push notifications [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
 
-**HTTP Method:** `POST`
-
-**Route:** `/api/users/profile/upload-image`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: multipart/form-data
+**Request:**
+```javascript
+{
+  "fcmToken": "dA7XvZ3k2Rg:APA91bH..."
+}
 ```
 
-#### Request Body (Form Data)
-```
-image: <FILE> (JPEG, PNG, max 5MB)
-```
-
-#### Business Logic
-
-1. Extract userId from JWT token
-2. Validate file type (JPEG, PNG only)
-3. Validate file size (max 5MB)
-4. Upload image to Cloudinary
-5. Generate optimized thumbnail (300x300)
-6. Update user's `profileImage` field with Cloudinary URL
-7. Delete old image from Cloudinary (if exists)
-8. Return new image URL
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "message": "Profile image uploaded successfully",
-  "data": {
-    "imageUrl": "https://res.cloudinary.com/trimzo/image/upload/v1670859678/users/507f1f77bcf86cd799439011.jpg",
-    "thumbnailUrl": "https://res.cloudinary.com/trimzo/image/upload/c_thumb,w_300,h_300/users/507f1f77bcf86cd799439011.jpg"
-  }
+  "message": "FCM token updated successfully"
 }
 ```
-
-#### Error Responses
-
-**Invalid File Type (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_FILE_TYPE",
-    "message": "Only JPEG and PNG images are allowed"
-  }
-}
-```
-
-**File Too Large (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "FILE_TOO_LARGE",
-    "message": "Image size must not exceed 5MB"
-  }
-}
-```
-
-#### Notes
-- Use Multer middleware for file parsing
-- Implement image compression before upload
-- Store Cloudinary public_id for deletion
-- Consider implementing image moderation (nudity detection)
 
 ***
 
-### 9. Delete User Account
+#### **4.1.6 Delete Account**
 
-**Endpoint:** Permanently delete user account
+**Endpoint:** `DELETE /api/auth/account`  
+**Access:** Private  
+**Description:** Soft delete user account (marks `isActive: false`) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
 
-**HTTP Method:** `DELETE`
-
-**Route:** `/api/users/profile`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Request Body
-```json
-{
-  "password": "SecurePass123!",
-  "confirmation": "DELETE"
-}
-```
-
-#### Business Logic
-
-1. Extract userId from JWT token
-2. Verify password is correct
-3. Verify confirmation text matches "DELETE"
-4. Cancel all active bookings
-5. Delete user's reviews (or mark as deleted)
-6. Remove user from all salon favorites
-7. Delete user document from database
-8. Delete profile image from Cloudinary
-9. Return success response
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "message": "Account deleted successfully",
-  "data": {
-    "deleted": true,
-    "deletedAt": "2025-12-12T23:55:00.000Z"
-  }
+  "message": "Account deactivated successfully"
 }
 ```
-
-#### Error Responses
-
-**Invalid Password (401)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "AUTH_INVALID_CREDENTIALS",
-    "message": "Incorrect password"
-  }
-}
-```
-
-**Active Bookings (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ACTIVE_BOOKINGS_EXIST",
-    "message": "Cannot delete account with active bookings",
-    "details": ["Please cancel or complete your bookings first"]
-  }
-}
-```
-
-#### Notes
-- **GDPR Compliance:** Permanently delete personal data
-- Consider soft delete with anonymization instead
-- Send confirmation email before deletion
-- Keep booking history for salon owners (anonymize user data)
 
 ***
 
-## Salon APIs
+### **4.2 USER PROFILE APIS**
 
-### 10. Get Nearby Salons
+#### **4.2.1 Get Extended Profile**
 
-**Endpoint:** Discover salons near user location
+**Endpoint:** `GET /api/auth/profile`  
+**Access:** Private  
+**Description:** Returns profile with preferred salons populated [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
 
-**HTTP Method:** `GET`
-
-**Route:** `/api/salons/nearby`
-
-**Access Level:** Public
-
-**Authentication Required:** No
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| latitude | Number | Yes | - | User's latitude |
-| longitude | Number | Yes | - | User's longitude |
-| radius | Number | No | 10 | Search radius in kilometers |
-| page | Number | No | 1 | Page number for pagination |
-| limit | Number | No | 20 | Results per page |
-| sortBy | String | No | distance | Sort by: distance, rating, waitTime |
-| isOpen | Boolean | No | - | Filter by open/closed status |
-| minRating | Number | No | - | Minimum average rating (1-5) |
-
-#### Example Request
-```http
-GET /api/salons/nearby?latitude=12.9716&longitude=77.5946&radius=5&sortBy=distance&limit=10
-```
-
-#### Business Logic
-
-1. Validate latitude and longitude (valid ranges)
-2. Convert radius from kilometers to meters for MongoDB query
-3. Use MongoDB geospatial query (`$near`) to find salons
-4. Calculate distance from user location to each salon
-5. Filter by `isOpen` status if provided
-6. Calculate current wait time for each salon (based on queue)
-7. Apply rating filter if `minRating` provided
-8. Sort results by specified field
-9. Paginate results
-10. Return salon list with distance and wait time
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "data": {
-    "salons": [
+  "user": {
+    "id": "...",
+    "phone": "+919876543210",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "profileImage": "https://...",
+    "loyaltyPoints": 150,
+    "totalBookings": 12,
+    "preferredSalons": [
       {
-        "_id": "507f1f77bcf86cd799439012",
-        "name": "Elite Hair Studio",
-        "description": "Premium hair cutting and styling",
-        "location": {
-          "type": "Point",
-          "coordinates": [77.5946, 12.9716],
-          "address": "123 MG Road, Bangalore",
-          "city": "Bangalore",
-          "state": "Karnataka",
-          "pincode": "560001"
-        },
-        "distance": 2.5,
-        "distanceUnit": "km",
-        "images": [
-          "https://cloudinary.com/salon1-img1.jpg",
-          "https://cloudinary.com/salon1-img2.jpg"
-        ],
-        "contactNumber": "+919876543211",
-        "rating": {
-          "average": 4.5,
-          "count": 120
-        },
-        "waitTime": 25,
-        "waitTimeUnit": "minutes",
-        "isOpen": true,
-        "openingHours": {
-          "monday": { "open": "09:00", "close": "21:00" },
-          "tuesday": { "open": "09:00", "close": "21:00" },
-          "wednesday": { "open": "09:00", "close": "21:00" },
-          "thursday": { "open": "09:00", "close": "21:00" },
-          "friday": { "open": "09:00", "close": "21:00" },
-          "saturday": { "open": "09:00", "close": "21:00" },
-          "sunday": { "closed": true }
-        },
-        "currentQueue": 3,
-        "owner": {
-          "_id": "507f1f77bcf86cd799439020",
-          "name": "Salon Owner Name"
-        }
+        "_id": "...",
+        "name": "StyleHub Men's Salon",
+        "location": { "city": "Mumbai", "address": "..." }
       }
     ],
-    "pagination": {
-      "currentPage": 1,
-      "totalPages": 5,
-      "totalItems": 48,
-      "itemsPerPage": 10,
-      "hasNextPage": true,
-      "hasPrevPage": false
-    },
-    "userLocation": {
-      "latitude": 12.9716,
-      "longitude": 77.5946
-    }
+    "createdAt": "...",
+    "lastLogin": "..."
   }
 }
 ```
-
-#### Error Responses
-
-**Invalid Coordinates (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_COORDINATES",
-    "message": "Invalid latitude or longitude",
-    "details": ["Latitude must be between -90 and 90", "Longitude must be between -180 and 180"]
-  }
-}
-```
-
-#### Related Models
-- **Salon Model:** Queries with geospatial index on `location.coordinates`
-- **Booking Model:** Counts active bookings for queue calculation
-- **Review Model:** Aggregates for average rating
-
-#### Frontend Notes
-- Always request location permission before calling this API
-- Implement pull-to-refresh to update salon list
-- Cache results for 5 minutes to reduce API calls
-- Show loading state while fetching
-- Handle empty state when no salons found
-- Display distance in km or miles based on user preference
-
-#### Performance Notes
-- MongoDB geospatial index MUST be created on `location.coordinates`
-- Cache wait time calculations for 2 minutes
-- Consider implementing Redis cache for frequently requested locations
-- Limit radius to max 50km to prevent slow queries
 
 ***
 
-### 11. Get Salon by ID
+### **4.3 SALON APIS**
 
-**Endpoint:** Retrieve detailed salon information
+#### **4.3.1 Get All Salons**
 
-**HTTP Method:** `GET`
+**Endpoint:** `GET /api/salons`  
+**Access:** Public  
+**Description:** Search salons with filters and pagination [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
 
-**Route:** `/api/salons/:salonId`
-
-**Access Level:** Public
-
-**Authentication Required:** No
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | MongoDB ObjectId of salon |
-
-#### Example Request
-```http
-GET /api/salons/507f1f77bcf86cd799439012
+**Query Parameters:**
+```
+page=1              # Pagination
+limit=10            # Items per page
+search=StyleHub     # Search by name/city/address
+city=Mumbai         # Filter by city
+type=men            # Filter by type (men/women/unisex)
+minRating=4         # Minimum average rating
+isOpen=true         # Only show open salons
 ```
 
-#### Business Logic
-
-1. Validate salonId format (MongoDB ObjectId)
-2. Find salon by ID in database
-3. Populate owner information (name, contact)
-4. Calculate current wait time based on active queue
-5. Fetch recent reviews (last 10)
-6. Calculate average ratings by category (ambiance, service, value)
-7. Check if user has favorited this salon (if authenticated)
-8. Return complete salon details
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "data": {
-    "salon": {
-      "_id": "507f1f77bcf86cd799439012",
-      "name": "Elite Hair Studio",
-      "description": "Premium hair cutting and styling with experienced professionals. We offer a wide range of services including haircuts, coloring, styling, and treatments.",
+  "count": 10,
+  "total": 45,
+  "salons": [
+    {
+      "_id": "60d5f484f1b2c72d88f8a1b2",
+      "name": "StyleHub Men's Salon",
+      "description": "Premium men's grooming",
       "location": {
-        "type": "Point",
-        "coordinates": [77.5946, 12.9716],
-        "address": "123 MG Road, Bangalore",
-        "city": "Bangalore",
-        "state": "Karnataka",
-        "pincode": "560001",
-        "landmark": "Near City Center Mall"
+        "coordinates": [72.8777, 19.0760],
+        "address": "123 Main St, Andheri",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400058"
       },
-      "contactNumber": "+919876543211",
-      "email": "elite@hairstudio.com",
-      "website": "https://elitehair.com",
-      "images": [
-        "https://cloudinary.com/salon1-main.jpg",
-        "https://cloudinary.com/salon1-interior1.jpg",
-        "https://cloudinary.com/salon1-interior2.jpg",
-        "https://cloudinary.com/salon1-services.jpg"
-      ],
+      "phone": "+919876543210",
+      "email": "info@stylehub.com",
+      "profileImage": "https://...",
+      "images": ["https://...", "https://..."],
+      "hours": {
+        "monday": { "open": "09:00", "close": "21:00", "closed": false },
+        // ... all days
+      },
       "services": [
         {
-          "_id": "507f1f77bcf86cd799439030",
-          "name": "Men's Haircut",
-          "description": "Professional haircut with styling",
+          "_id": "...",
+          "name": "Haircut",
           "price": 300,
           "duration": 30,
-          "category": "Haircut"
-        },
-        {
-          "_id": "507f1f77bcf86cd799439031",
-          "name": "Hair Coloring",
-          "description": "Full hair coloring service",
-          "price": 1500,
-          "duration": 90,
-          "category": "Coloring"
+          "category": "Hair",
+          "isPrimary": true,
+          "isUpsell": false
         }
       ],
-      "rating": {
-        "average": 4.5,
-        "count": 120,
-        "breakdown": {
-          "5": 70,
-          "4": 35,
-          "3": 10,
-          "2": 3,
-          "1": 2
-        },
-        "categories": {
-          "ambiance": 4.6,
-          "service": 4.5,
-          "value": 4.3
-        }
-      },
-      "waitTime": 25,
-      "currentQueue": 3,
+      "averageRating": 4.5,
+      "totalReviews": 128,
       "isOpen": true,
-      "openingHours": {
-        "monday": { "open": "09:00", "close": "21:00" },
-        "tuesday": { "open": "09:00", "close": "21:00" },
-        "wednesday": { "open": "09:00", "close": "21:00" },
-        "thursday": { "open": "09:00", "close": "21:00" },
-        "friday": { "open": "09:00", "close": "21:00" },
-        "saturday": { "open": "09:00", "close": "21:00" },
-        "sunday": { "closed": true }
-      },
-      "amenities": ["WiFi", "AC", "Parking", "Card Payment"],
-      "owner": {
-        "_id": "507f1f77bcf86cd799439020",
-        "name": "Rajesh Kumar",
-        "phone": "+919876543211"
-      },
-      "recentReviews": [
-        {
-          "_id": "507f1f77bcf86cd799439040",
-          "user": {
-            "_id": "507f1f77bcf86cd799439011",
-            "name": "John Doe",
-            "profileImage": "https://cloudinary.com/user.jpg"
-          },
-          "rating": 5,
-          "comment": "Excellent service and great ambiance!",
-          "createdAt": "2025-12-10T14:30:00.000Z"
-        }
-      ],
-      "totalReviews": 120,
-      "isFavorite": false,
-      "createdAt": "2024-01-15T00:00:00.000Z",
-      "updatedAt": "2025-12-12T20:00:00.000Z"
-    }
-  }
-}
-```
-
-#### Error Responses
-
-**Invalid Salon ID (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_SALON_ID",
-    "message": "Invalid salon ID format"
-  }
-}
-```
-
-**Salon Not Found (404)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "SALON_NOT_FOUND",
-    "message": "Salon not found"
-  }
-}
-```
-
-#### Related Models
-- **Salon Model:** Main salon document
-- **Service Model:** Embedded services array
-- **Review Model:** Aggregated reviews with user details
-- **Booking Model:** Current queue count
-
-#### Frontend Notes
-- Cache salon details for 10 minutes
-- Show skeleton loader while fetching
-- Implement image carousel for salon images
-- Display "Call Now" button with contact number
-- Show "Get Directions" button linking to maps
-- Highlight if salon is in user's favorites
-
-***
-
-### 12. Search Salons
-
-**Endpoint:** Search salons by name, services, or location
-
-**HTTP Method:** `GET`
-
-**Route:** `/api/salons/search`
-
-**Access Level:** Public
-
-**Authentication Required:** No
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| q | String | Yes | - | Search query (salon name, service) |
-| city | String | No | - | Filter by city |
-| latitude | Number | No | - | User latitude for distance sorting |
-| longitude | Number | No | - | User longitude for distance sorting |
-| page | Number | No | 1 | Page number |
-| limit | Number | No | 20 | Results per page |
-
-#### Example Request
-```http
-GET /api/salons/search?q=hair coloring&city=Bangalore&page=1&limit=10
-```
-
-#### Business Logic
-
-1. Parse and sanitize search query
-2. Create text search index on salon name, description, services
-3. Search across multiple fields (name, services, description)
-4. Filter by city if provided
-5. Calculate distance if coordinates provided
-6. Sort by relevance score, then distance
-7. Paginate results
-8. Return matching salons with highlighted search terms
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "data": {
-    "salons": [
-      {
-        "_id": "507f1f77bcf86cd799439012",
-        "name": "Elite Hair Studio",
-        "description": "Premium hair cutting and styling",
-        "location": {
-          "address": "123 MG Road, Bangalore",
-          "city": "Bangalore"
-        },
-        "distance": 3.2,
-        "rating": {
-          "average": 4.5,
-          "count": 120
-        },
-        "matchedServices": ["Hair Coloring", "Hair Styling"],
-        "relevanceScore": 0.92,
-        "images": ["https://cloudinary.com/salon1.jpg"],
-        "isOpen": true
+      "currentQueueSize": 3,
+      "type": "men",
+      "totalBarbers": 4,
+      "activeBarbers": 3,
+      "busyMode": false,
+      "isVerified": true,
+      
+      // Personalized wait time (varies per user)
+      "waitTime": {
+        "waitMinutes": 45,
+        "displayText": "~45 min wait",
+        "queueLength": 3,
+        "queuePosition": null,  // null if user not in queue
+        "status": "busy",       // available|busy|very-busy|full|closed
+        "estimatedStartTime": "2026-01-24T06:15:00.000Z",
+        "isInQueue": false,
+        "timestamp": 1737698700000
       }
-    ],
-    "pagination": {
-      "currentPage": 1,
-      "totalPages": 3,
-      "totalItems": 27,
-      "itemsPerPage": 10
-    },
-    "searchQuery": "hair coloring",
-    "filters": {
-      "city": "Bangalore"
     }
-  }
-}
-```
-
-#### Error Responses
-
-**Missing Query (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "MISSING_SEARCH_QUERY",
-    "message": "Search query 'q' is required"
-  }
-}
-```
-
-#### Frontend Notes
-- Implement debounced search (wait 300ms after user stops typing)
-- Show search suggestions based on popular services
-- Highlight matched terms in results
-- Cache search results for same query
-
-***
-
-### 13. Create Salon (Owner Only)
-
-**Endpoint:** Register a new salon
-
-**HTTP Method:** `POST`
-
-**Route:** `/api/salons`
-
-**Access Level:** Salon Owner, Admin
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body
-```json
-{
-  "name": "Elite Hair Studio",
-  "description": "Premium hair cutting and styling services",
-  "location": {
-    "address": "123 MG Road, Bangalore",
-    "city": "Bangalore",
-    "state": "Karnataka",
-    "pincode": "560001",
-    "coordinates": [77.5946, 12.9716],
-    "landmark": "Near City Center Mall"
-  },
-  "contactNumber": "+919876543211",
-  "email": "elite@hairstudio.com",
-  "website": "https://elitehair.com",
-  "openingHours": {
-    "monday": { "open": "09:00", "close": "21:00" },
-    "tuesday": { "open": "09:00", "close": "21:00" },
-    "wednesday": { "open": "09:00", "close": "21:00" },
-    "thursday": { "open": "09:00", "close": "21:00" },
-    "friday": { "open": "09:00", "close": "21:00" },
-    "saturday": { "open": "09:00", "close": "21:00" },
-    "sunday": { "closed": true }
-  },
-  "services": [
-    {
-      "name": "Men's Haircut",
-      "description": "Professional haircut with styling",
-      "price": 300,
-      "duration": 30,
-      "category": "Haircut"
-    }
-  ],
-  "amenities": ["WiFi", "AC", "Parking", "Card Payment"]
-}
-```
-
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| name | String | Yes | Min 3 chars, max 100 chars, unique |
-| description | String | Yes | Min 20 chars, max 500 chars |
-| location.address | String | Yes | Min 10 chars |
-| location.coordinates | [Number] | Yes | [longitude, latitude] valid range |
-| location.city | String | Yes | - |
-| contactNumber | String | Yes | Valid phone format |
-| email | String | No | Valid email format |
-| openingHours | Object | Yes | All weekdays with open/close or closed |
-| services | Array | Yes | At least 1 service |
-
-#### Business Logic
-
-1. Verify user role is "owner" or "admin"
-2. Validate all required fields
-3. Verify coordinates are valid (reverse geocode)
-4. Check if salon name already exists in same city
-5. Create GeoJSON Point for location
-6. Create Salon document with owner reference
-7. Upload default images if not provided
-8. Return created salon with ID
-
-#### Success Response
-
-**Status Code:** `201 Created`
-
-```json
-{
-  "success": true,
-  "message": "Salon created successfully",
-  "data": {
-    "salon": {
-      "_id": "507f1f77bcf86cd799439012",
-      "name": "Elite Hair Studio",
-      "description": "Premium hair cutting and styling services",
-      "location": {
-        "type": "Point",
-        "coordinates": [77.5946, 12.9716],
-        "address": "123 MG Road, Bangalore",
-        "city": "Bangalore",
-        "state": "Karnataka",
-        "pincode": "560001"
-      },
-      "owner": "507f1f77bcf86cd799439020",
-      "contactNumber": "+919876543211",
-      "isOpen": false,
-      "rating": {
-        "average": 0,
-        "count": 0
-      },
-      "createdAt": "2025-12-12T23:55:00.000Z"
-    }
-  }
-}
-```
-
-#### Error Responses
-
-**Insufficient Permissions (403)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INSUFFICIENT_PERMISSIONS",
-    "message": "Only salon owners can create salons"
-  }
-}
-```
-
-**Duplicate Salon (409)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "SALON_ALREADY_EXISTS",
-    "message": "A salon with this name already exists in this city"
-  }
-}
-```
-
-#### Related Models
-- **Salon Model:** Creates new salon document
-- **User Model:** Links owner via userId
-
-#### Notes
-- Salon starts with `isOpen: false` (owner must activate)
-- Email verification may be required before activation
-- Consider implementing salon approval workflow for quality control
-
-***
-
-### 14. Update Salon (Owner Only)
-
-**Endpoint:** Update salon information
-
-**HTTP Method:** `PUT`
-
-**Route:** `/api/salons/:salonId`
-
-**Access Level:** Salon Owner (own salon), Admin
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | Salon ID to update |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body
-```json
-{
-  "name": "Elite Hair Studio & Spa",
-  "description": "Updated description",
-  "contactNumber": "+919876543222",
-  "openingHours": {
-    "monday": { "open": "10:00", "close": "22:00" }
-  },
-  "services": [
-    {
-      "_id": "507f1f77bcf86cd799439030",
-      "name": "Men's Haircut",
-      "price": 350,
-      "duration": 30
-    }
-  ],
-  "amenities": ["WiFi", "AC", "Parking", "Card Payment", "Massage Chairs"]
-}
-```
-
-#### Business Logic
-
-1. Verify user is owner of this salon OR admin
-2. Validate salonId and find salon
-3. Check ownership: `salon.owner === req.user.userId`
-4. Validate updated fields
-5. Update only provided fields (partial update)
-6. If services updated → recalculate average service duration
-7. If opening hours updated → check current time and update `isOpen` status
-8. Return updated salon
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Salon updated successfully",
-  "data": {
-    "salon": {
-      "_id": "507f1f77bcf86cd799439012",
-      "name": "Elite Hair Studio & Spa",
-      "description": "Updated description",
-      "contactNumber": "+919876543222",
-      "services": [...],
-      "amenities": [...],
-      "updatedAt": "2025-12-12T23:55:00.000Z"
-    }
-  }
-}
-```
-
-#### Error Responses
-
-**Unauthorized (403)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "UNAUTHORIZED_SALON_ACCESS",
-    "message": "You do not have permission to update this salon"
-  }
-}
-```
-
-#### Notes
-- Only salon owner or admin can update
-- Partial updates supported (send only changed fields)
-- Location coordinates cannot be changed (requires admin approval)
-
-***
-
-### 15. Delete Salon (Owner/Admin Only)
-
-**Endpoint:** Delete salon
-
-**HTTP Method:** `DELETE`
-
-**Route:** `/api/salons/:salonId`
-
-**Access Level:** Salon Owner (own salon), Admin
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | Salon ID to delete |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Business Logic
-
-1. Verify user is owner or admin
-2. Check for active bookings (cannot delete if active bookings exist)
-3. Cancel all pending bookings
-4. Soft delete salon (set `isDeleted: true, deletedAt: timestamp`)
-5. Remove from search indexes
-6. Delete salon images from Cloudinary
-7. Keep reviews for historical purposes (anonymize salon reference)
-8. Return success
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Salon deleted successfully",
-  "data": {
-    "deleted": true,
-    "deletedAt": "2025-12-12T23:55:00.000Z",
-    "affectedBookings": 2
-  }
-}
-```
-
-#### Error Responses
-
-**Active Bookings (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ACTIVE_BOOKINGS_EXIST",
-    "message": "Cannot delete salon with active bookings",
-    "details": ["3 active bookings must be completed or cancelled first"]
-  }
-}
-```
-
-#### Notes
-- **Soft delete** recommended (set flag instead of removing document)
-- Notify users with pending bookings
-- Consider 30-day grace period before permanent deletion
-
-***
-
-### 16. Upload Salon Images (Owner Only)
-
-**Endpoint:** Upload salon images
-
-**HTTP Method:** `POST`
-
-**Route:** `/api/salons/:salonId/images`
-
-**Access Level:** Salon Owner (own salon), Admin
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | Salon ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: multipart/form-data
-```
-
-#### Request Body (Form Data)
-```
-images: <FILE[]> (Multiple JPEG/PNG files, max 10 images, 5MB each)
-```
-
-#### Business Logic
-
-1. Verify ownership of salon
-2. Validate file types (JPEG, PNG only)
-3. Validate file sizes (max 5MB each)
-4. Limit total images to 10 per salon
-5. Upload to Cloudinary in parallel
-6. Generate thumbnails (800x600)
-7. Add image URLs to salon's `images` array
-8. Return uploaded image URLs
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Images uploaded successfully",
-  "data": {
-    "uploadedImages": [
-      {
-        "url": "https://cloudinary.com/salon1-img1.jpg",
-        "thumbnail": "https://cloudinary.com/salon1-img1-thumb.jpg",
-        "publicId": "salons/507f1f77bcf86cd799439012/img1"
-      },
-      {
-        "url": "https://cloudinary.com/salon1-img2.jpg",
-        "thumbnail": "https://cloudinary.com/salon1-img2-thumb.jpg",
-        "publicId": "salons/507f1f77bcf86cd799439012/img2"
-      }
-    ],
-    "totalImages": 5
-  }
-}
-```
-
-#### Error Responses
-
-**Image Limit Exceeded (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "IMAGE_LIMIT_EXCEEDED",
-    "message": "Maximum 10 images allowed per salon",
-    "details": ["Current: 8 images, Attempted: 5 new images"]
-  }
-}
-```
-
-#### Notes
-- First uploaded image becomes primary/thumbnail
-- Implement image compression (quality: 80%)
-- Store Cloudinary public_id for deletion
-- Consider implementing image moderation API
-
-***
-
-## Booking APIs
-
-### 17. Create Booking
-
-**Endpoint:** Book a salon service (join queue)
-
-**HTTP Method:** `POST`
-
-**Route:** `/api/bookings`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body
-```json
-{
-  "salonId": "507f1f77bcf86cd799439012",
-  "services": [
-    "507f1f77bcf86cd799439030",
-    "507f1f77bcf86cd799439031"
-  ],
-  "scheduledTime": "2025-12-13T14:00:00.000Z",
-  "notes": "Please use organic products"
-}
-```
-
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| salonId | ObjectId | Yes | Valid salon ID, must exist |
-| services | ObjectId[] | Yes | Array of service IDs, at least 1 |
-| scheduledTime | Date | No | Future datetime, within salon hours |
-| notes | String | No | Max 500 chars |
-
-#### Business Logic
-
-1. Validate user authentication
-2. Verify salon exists and is open
-3. Validate all service IDs belong to this salon
-4. Calculate total duration (sum of all service durations)
-5. Calculate total price (sum of all service prices)
-6. Check salon operating hours for scheduledTime
-7. Find current queue position (count active bookings + 1)
-8. Calculate estimated start time based on queue
-9. Create Booking document with status "pending"
-10. Send confirmation notification to user
-11. Notify salon owner of new booking
-12. Return booking details with queue position
-
-#### Success Response
-
-**Status Code:** `201 Created`
-
-```json
-{
-  "success": true,
-  "message": "Booking created successfully",
-  "data": {
-    "booking": {
-      "_id": "507f1f77bcf86cd799439050",
-      "user": {
-        "_id": "507f1f77bcf86cd799439011",
-        "name": "John Doe",
-        "phone": "+919876543210"
-      },
-      "salon": {
-        "_id": "507f1f77bcf86cd799439012",
-        "name": "Elite Hair Studio",
-        "address": "123 MG Road, Bangalore",
-        "contactNumber": "+919876543211"
-      },
-      "services": [
-        {
-          "_id": "507f1f77bcf86cd799439030",
-          "name": "Men's Haircut",
-          "price": 300,
-          "duration": 30
-        },
-        {
-          "_id": "507f1f77bcf86cd799439031",
-          "name": "Hair Coloring",
-          "price": 1500,
-          "duration": 90
-        }
-      ],
-      "totalPrice": 1800,
-      "totalDuration": 120,
-      "status": "pending",
-      "queuePosition": 3,
-      "estimatedStartTime": "2025-12-13T14:45:00.000Z",
-      "scheduledTime": "2025-12-13T14:00:00.000Z",
-      "notes": "Please use organic products",
-      "createdAt": "2025-12-12T23:55:00.000Z"
-    }
-  }
-}
-```
-
-#### Error Responses
-
-**Salon Closed (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "SALON_CLOSED",
-    "message": "Salon is currently closed",
-    "details": ["Opening hours: Mon-Sat 09:00-21:00"]
-  }
-}
-```
-
-**Invalid Service (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_SERVICE",
-    "message": "One or more services do not belong to this salon"
-  }
-}
-```
-
-**Duplicate Booking (409)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "DUPLICATE_BOOKING",
-    "message": "You already have an active booking at this salon",
-    "details": ["Please complete or cancel existing booking first"]
-  }
-}
-```
-
-#### Related Models
-- **Booking Model:** Creates new booking document
-- **Salon Model:** Fetches salon details and validates services
-- **Service Model:** Embedded in salon, validates service IDs
-- **User Model:** Links user to booking
-
-#### Frontend Notes
-- Show estimated wait time BEFORE booking
-- Display total price clearly
-- Allow service selection with real-time price update
-- Implement booking confirmation dialog
-- Store booking ID for tracking
-- Enable push notifications for booking updates
-
-#### Edge Cases
-- User cancels during creation → Handle gracefully
-- Salon closes while booking → Reject with clear message
-- Multiple bookings simultaneously → Lock mechanism to prevent race condition
-- Service price changes during booking → Use cached price
-
-***
-
-### 18. Get User Bookings
-
-**Endpoint:** Retrieve user's booking history
-
-**HTTP Method:** `GET`
-
-**Route:** `/api/bookings/my-bookings`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| status | String | No | all | Filter: all, pending, in-progress, completed, cancelled |
-| page | Number | No | 1 | Page number |
-| limit | Number | No | 20 | Results per page |
-| sortBy | String | No | createdAt | Sort by: createdAt, scheduledTime, status |
-| sortOrder | String | No | desc | asc or desc |
-
-#### Example Request
-```http
-GET /api/bookings/my-bookings?status=pending&page=1&limit=10
-```
-
-#### Business Logic
-
-1. Extract userId from JWT token
-2. Query bookings where user === userId
-3. Filter by status if provided
-4. Populate salon and service details
-5. Calculate current wait time for pending bookings
-6. Sort by specified field and order
-7. Paginate results
-8. Return booking list
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "data": {
-    "bookings": [
-      {
-        "_id": "507f1f77bcf86cd799439050",
-        "salon": {
-          "_id": "507f1f77bcf86cd799439012",
-          "name": "Elite Hair Studio",
-          "address": "123 MG Road, Bangalore",
-          "contactNumber": "+919876543211",
-          "images": ["https://cloudinary.com/salon1.jpg"]
-        },
-        "services": [
-          {
-            "name": "Men's Haircut",
-            "price": 300,
-            "duration": 30
-          }
-        ],
-        "totalPrice": 300,
-        "totalDuration": 30,
-        "status": "pending",
-        "queuePosition": 2,
-        "estimatedStartTime": "2025-12-13T14:30:00.000Z",
-        "scheduledTime": "2025-12-13T14:00:00.000Z",
-        "currentWaitTime": 25,
-        "createdAt": "2025-12-12T23:55:00.000Z"
-      }
-    ],
-    "pagination": {
-      "currentPage": 1,
-      "totalPages": 3,
-      "totalItems": 27,
-      "itemsPerPage": 10
-    },
-    "summary": {
-      "totalBookings": 27,
-      "pending": 1,
-      "completed": 24,
-      "cancelled": 2
-    }
-  }
-}
-```
-
-#### Error Responses
-
-**Invalid Status (400)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_STATUS",
-    "message": "Invalid status value",
-    "details": ["Allowed values: pending, in-progress, completed, cancelled"]
-  }
-}
-```
-
-#### Frontend Notes
-- Show active bookings at top
-- Group by status in tabs (Active, Past, Cancelled)
-- Display queue position prominently for pending
-- Show countdown timer for estimated start time
-- Enable pull-to-refresh for real-time updates
-- Cache completed bookings (they don't change)
-
-***
-
-### 19. Get Booking by ID
-
-**Endpoint:** Retrieve detailed booking information
-
-**HTTP Method:** `GET`
-
-**Route:** `/api/bookings/:bookingId`
-
-**Access Level:** Authenticated User (own booking), Salon Owner, Admin
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| bookingId | ObjectId | Yes | Booking ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Business Logic
-
-1. Validate bookingId format
-2. Find booking by ID
-3. Verify access: user is booking owner OR salon owner OR admin
-4. Populate full salon details
-5. Populate user details (if salon owner viewing)
-6. Calculate real-time queue position
-7. Return complete booking details
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "data": {
-    "booking": {
-      "_id": "507f1f77bcf86cd799439050",
-      "user": {
-        "_id": "507f1f77bcf86cd799439011",
-        "name": "John Doe",
-        "phone": "+919876543210",
-        "profileImage": "https://cloudinary.com/user.jpg"
-      },
-      "salon": {
-        "_id": "507f1f77bcf86cd799439012",
-        "name": "Elite Hair Studio",
-        "location": {
-          "address": "123 MG Road, Bangalore",
-          "coordinates": [77.5946, 12.9716]
-        },
-        "contactNumber": "+919876543211",
-        "images": ["https://cloudinary.com/salon1.jpg"]
-      },
-      "services": [
-        {
-          "_id": "507f1f77bcf86cd799439030",
-          "name": "Men's Haircut",
-          "description": "Professional haircut with styling",
-          "price": 300,
-          "duration": 30,
-          "category": "Haircut"
-        }
-      ],
-      "totalPrice": 300,
-      "totalDuration": 30,
-      "status": "pending",
-      "queuePosition": 2,
-      "estimatedStartTime": "2025-12-13T14:30:00.000Z",
-      "actualStartTime": null,
-      "completionTime": null,
-      "scheduledTime": "2025-12-13T14:00:00.000Z",
-      "notes": "Please use organic products",
-      "cancellationReason": null,
-      "createdAt": "2025-12-12T23:55:00.000Z",
-      "updatedAt": "2025-12-12T23:55:00.000Z",
-      "statusHistory": [
-        {
-          "status": "pending",
-          "timestamp": "2025-12-12T23:55:00.000Z"
-        }
-      ]
-    }
-  }
-}
-```
-
-#### Error Responses
-
-**Unauthorized Access (403)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "UNAUTHORIZED_BOOKING_ACCESS",
-    "message": "You do not have permission to view this booking"
-  }
-}
-```
-
-**Booking Not Found (404)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "BOOKING_NOT_FOUND",
-    "message": "Booking not found"
-  }
-}
-```
-
-#### Frontend Notes
-- Show different views for user vs salon owner
-- Display real-time queue position updates
-- Show "Get Directions" for user
-- Show "Contact Customer" for salon owner
-- Enable status updates for salon owner
-
-***
-
-### 20. Cancel Booking
-
-**Endpoint:** Cancel a booking
-
-**HTTP Method:** `PATCH`
-
-**Route:** `/api/bookings/:bookingId/cancel`
-
-**Access Level:** Authenticated User (own booking), Salon Owner
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| bookingId | ObjectId | Yes | Booking ID to cancel |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body
-```json
-{
-  "reason": "Emergency came up, need to reschedule"
-}
-```
-
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| reason | String | No | Max 500 chars |
-
-#### Business Logic
-
-1. Find booking by ID
-2. Verify booking belongs to user OR user is salon owner
-3. Check booking status (can only cancel "pending" bookings)
-4. Check cancellation policy (e.g., no cancellation within 1 hour of scheduled time)
-5. Update booking status to "cancelled"
-6. Add cancellation reason and timestamp
-7. Recalculate queue positions for remaining bookings
-8. Send cancellation notification to user and salon
-9. Add to status history
-10. Return updated booking
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Booking cancelled successfully",
-  "data": {
-    "booking": {
-      "_id": "507f1f77bcf86cd799439050",
-      "status": "cancelled",
-      "cancellationReason": "Emergency came up, need to reschedule",
-      "cancelledBy": "user",
-      "cancelledAt": "2025-12-12T23:55:00.000Z",
-      "refundEligible": false
-    }
-  }
-}
-```
-
-#### Error Responses
-
-**Already Started (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "BOOKING_ALREADY_STARTED",
-    "message": "Cannot cancel booking that has already started"
-  }
-}
-```
-
-**Late Cancellation (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "LATE_CANCELLATION",
-    "message": "Cannot cancel booking within 1 hour of scheduled time",
-    "details": ["Scheduled time: 2025-12-13T14:00:00.000Z", "Current time: 2025-12-13T13:30:00.000Z"]
-  }
-}
-```
-
-#### Frontend Notes
-- Show cancellation policy before confirming
-- Require confirmation dialog
-- Display reason input (optional but recommended)
-- Update UI immediately after cancellation
-- Remove from active bookings list
-
-#### Edge Cases
-- User cancels just before service starts → May incur penalty
-- Salon cancels on behalf of user → Different notification
-- Network failure during cancellation → Implement idempotency
-
-***
-
-### 21. Start Booking (Owner Only)
-
-**Endpoint:** Mark booking as started (service in progress)
-
-**HTTP Method:** `PATCH`
-
-**Route:** `/api/bookings/:bookingId/start`
-
-**Access Level:** Salon Owner (own salon)
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| bookingId | ObjectId | Yes | Booking ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Business Logic
-
-1. Verify user is salon owner
-2. Find booking and verify it belongs to owner's salon
-3. Check booking status is "pending"
-4. Verify this is the next booking in queue (queuePosition === 1)
-5. Update status to "in-progress"
-6. Set `actualStartTime` to current timestamp
-7. Recalculate queue positions for remaining bookings
-8. Send notification to user (your service has started)
-9. Return updated booking
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Booking started successfully",
-  "data": {
-    "booking": {
-      "_id": "507f1f77bcf86cd799439050",
-      "status": "in-progress",
-      "actualStartTime": "2025-12-13T14:32:00.000Z",
-      "estimatedCompletionTime": "2025-12-13T15:02:00.000Z"
-    }
-  }
-}
-```
-
-#### Error Responses
-
-**Not Next in Queue (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "NOT_NEXT_IN_QUEUE",
-    "message": "This booking is not next in queue",
-    "details": ["Current queue position: 3", "Complete previous bookings first"]
-  }
-}
-```
-
-#### Notes
-- Only allow starting bookings in queue order
-- Automatically update wait times for other users
-- Send push notification to user
-
-***
-
-### 22. Complete Booking (Owner Only)
-
-**Endpoint:** Mark booking as completed
-
-**HTTP Method:** `PATCH`
-
-**Route:** `/api/bookings/:bookingId/complete`
-
-**Access Level:** Salon Owner (own salon)
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| bookingId | ObjectId | Yes | Booking ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Business Logic
-
-1. Verify user is salon owner
-2. Find booking and verify ownership
-3. Check status is "in-progress"
-4. Update status to "completed"
-5. Set `completionTime` to current timestamp
-6. Calculate actual duration (completionTime - actualStartTime)
-7. Send notification to user (service completed, please review)
-8. Update salon statistics (total bookings, average service time)
-9. Return updated booking
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Booking completed successfully",
-  "data": {
-    "booking": {
-      "_id": "507f1f77bcf86cd799439050",
-      "status": "completed",
-      "actualStartTime": "2025-12-13T14:32:00.000Z",
-      "completionTime": "2025-12-13T15:05:00.000Z",
-      "actualDuration": 33,
-      "scheduledDuration": 30
-    },
-    "promptReview": true
-  }
-}
-```
-
-#### Error Responses
-
-**Not In Progress (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "BOOKING_NOT_IN_PROGRESS",
-    "message": "Booking must be in progress to complete"
-  }
-}
-```
-
-#### Notes
-- Prompt user to leave review after completion
-- Update salon analytics in background
-- Archive completed booking after 30 days
-
-***
-
-### 23. Get Salon Queue (Owner Only)
-
-**Endpoint:** View current queue for salon
-
-**HTTP Method:** `GET`
-
-**Route:** `/api/bookings/salon/:salonId/queue`
-
-**Access Level:** Salon Owner (own salon), Admin
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | Salon ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Business Logic
-
-1. Verify user owns this salon OR is admin
-2. Find all bookings for salon with status "pending" or "in-progress"
-3. Sort by queuePosition
-4. Populate user details for each booking
-5. Calculate total estimated time to complete queue
-6. Return sorted queue
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "data": {
-    "queue": [
-      {
-        "_id": "507f1f77bcf86cd799439050",
-        "user": {
-          "_id": "507f1f77bcf86cd799439011",
-          "name": "John Doe",
-          "phone": "+919876543210",
-          "profileImage": "https://cloudinary.com/user.jpg"
-        },
-        "services": ["Men's Haircut", "Beard Trim"],
-        "totalDuration": 45,
-        "totalPrice": 450,
-        "status": "in-progress",
-        "queuePosition": 1,
-        "actualStartTime": "2025-12-13T14:32:00.000Z",
-        "estimatedCompletionTime": "2025-12-13T15:17:00.000Z",
-        "scheduledTime": "2025-12-13T14:00:00.000Z",
-        "notes": "Use organic products"
-      },
-      {
-        "_id": "507f1f77bcf86cd799439051",
-        "user": {
-          "_id": "507f1f77bcf86cd799439013",
-          "name": "Jane Smith",
-          "phone": "+919876543220"
-        },
-        "services": ["Hair Coloring"],
-        "totalDuration": 90,
-        "totalPrice": 1500,
-        "status": "pending",
-        "queuePosition": 2,
-        "estimatedStartTime": "2025-12-13T15:17:00.000Z",
-        "scheduledTime": "2025-12-13T15:00:00.000Z"
-      }
-    ],
-    "queueSummary": {
-      "totalInQueue": 2,
-      "inProgress": 1,
-      "pending": 1,
-      "estimatedWaitTime": 135,
-      "averageServiceTime": 45
-    }
-  }
-}
-```
-
-#### Frontend Notes
-- Display as list with drag-to-reorder (future feature)
-- Show countdown for current booking
-- Highlight overdue bookings
-- Enable quick actions (start, complete, cancel)
-- Auto-refresh every 30 seconds
-
-***
-
-## Review APIs
-
-### 24. Create Review
-
-**Endpoint:** Submit a review for salon
-
-**HTTP Method:** `POST`
-
-**Route:** `/api/reviews`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body
-```json
-{
-  "salonId": "507f1f77bcf86cd799439012",
-  "bookingId": "507f1f77bcf86cd799439050",
-  "rating": 5,
-  "comment": "Excellent service! Very professional staff and great ambiance.",
-  "categories": {
-    "ambiance": 5,
-    "service": 5,
-    "value": 4
-  },
-  "images": [
-    "https://cloudinary.com/review-img1.jpg"
   ]
 }
 ```
 
-| Field | Type | Required | Validation Rules |
-|-------|------|----------|------------------|
-| salonId | ObjectId | Yes | Valid salon ID |
-| bookingId | ObjectId | No | Must be completed booking |
-| rating | Number | Yes | Integer 1-5 |
-| comment | String | No | Max 1000 chars |
-| categories | Object | No | Each rating 1-5 |
-| images | String[] | No | Max 5 images |
+**Note:** Wait times are personalized (see [Section 6.3](#63-wait-time-calculation-service)) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
 
-#### Business Logic
+***
 
-1. Validate user authentication
-2. Verify salon exists
-3. If bookingId provided:
-   - Verify booking exists and belongs to user
-   - Verify booking status is "completed"
-   - Check if review already exists for this booking
-4. Validate rating (1-5 range)
-5. Create Review document
-6. Update salon's average rating (aggregate all reviews)
-7. Update booking with review reference
-8. Send notification to salon owner
-9. Return created review
+#### **4.3.2 Get Nearby Salons (Geospatial)**
 
-#### Success Response
+**Endpoint:** `GET /api/salons/nearby`  
+**Access:** Public  
+**Description:** Find salons within radius using MongoDB geospatial query [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
 
-**Status Code:** `201 Created`
+**Query Parameters:**
+```
+latitude=19.0760    # Required
+longitude=72.8777   # Required
+radius=5            # km (default: 5, max: 50)
+limit=20
+page=1
+```
 
-```json
+**Response:** Same as 4.3.1 but sorted by distance (nearest first) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+#### **4.3.3 Get Salon by ID**
+
+**Endpoint:** `GET /api/salons/:id`  
+**Access:** Public  
+**Description:** Get detailed salon information [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "salon": {
+    // Same as 4.3.1 salon object
+    // Includes personalized wait time if userId in request (via protect middleware)
+  }
+}
+```
+
+***
+
+#### **4.3.4 Create Salon**
+
+**Endpoint:** `POST /api/salons`  
+**Access:** Private (Owner role)  
+**Description:** Create new salon and link to owner [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Request:**
+```javascript
+{
+  "name": "StyleHub Men's Salon",
+  "description": "Premium men's grooming services",
+  "location": {
+    "coordinates": [72.8777, 19.0760],  // [longitude, latitude]
+    "address": "123 Main St, Andheri West",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "pincode": "400058"
+  },
+  "phone": "+919876543210",
+  "email": "info@stylehub.com",
+  "hours": {
+    "monday": { "open": "09:00", "close": "21:00", "closed": false },
+    // ... all 7 days
+  },
+  "services": [
+    {
+      "name": "Haircut",
+      "price": 300,
+      "duration": 30,
+      "description": "Classic haircut",
+      "category": "Hair",
+      "isPrimary": true,
+      "isUpsell": false
+    }
+  ],
+  "images": ["https://...", "https://..."],
+  "totalBarbers": 4,
+  "activeBarbers": 3,
+  "averageServiceDuration": 30
+}
+```
+
+**Response (201):**
+```javascript
+{
+  "success": true,
+  "message": "Salon created successfully",
+  "salon": {
+    "_id": "...",
+    "name": "StyleHub Men's Salon"
+  }
+}
+```
+
+**Notes:**
+- Automatically sets `ownerId` to `req.user._id`
+- Links salon to user's `salonId` field
+- Sets `isActive: false` and `isVerified: false` (requires admin approval) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+#### **4.3.5 Update Salon**
+
+**Endpoint:** `PUT /api/salons/:id`  
+**Access:** Private (Owner of salon)  
+**Description:** Update salon details [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Request:** (all fields optional)
+```javascript
+{
+  "name": "StyleHub Premium",
+  "description": "Updated description",
+  "phone": "+919876543211",
+  "email": "new@stylehub.com",
+  "profileImage": "https://...",
+  "images": ["https://...", "https://..."],
+  "hours": { /* ... */ },
+  "services": [ /* ... */ ],
+  "isOpen": true,
+  "totalBarbers": 5,
+  "activeBarbers": 4,
+  "busyMode": false,
+  "type": "men",
+  
+  // Only allowed if locationEditEnabled = true
+  "location": {
+    "coordinates": [72.8888, 19.0770],
+    "address": "New address",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "pincode": "400058"
+  }
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Salon updated successfully",
+  "salon": { /* updated salon */ }
+}
+```
+
+**Permissions:**
+- Location editing blocked unless `salon.locationEditEnabled === true` (admin-controlled)
+- Owner can only update their own salons [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+#### **4.3.6 Get My Salons**
+
+**Endpoint:** `GET /api/salons/my-salons`  
+**Access:** Private (Owner role)  
+**Description:** Get all salons owned by current user [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "count": 2,
+  "salons": [
+    { /* salon 1 */ },
+    { /* salon 2 */ }
+  ]
+}
+```
+
+***
+
+#### **4.3.7 Toggle Salon Status (Open/Close)**
+
+**Endpoint:** `PATCH /api/salons/:salonId/toggle-status`  
+**Access:** Private (Owner/Manager)  
+**Description:** Quickly open/close salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Salon is now open",
+  "isOpen": true
+}
+```
+
+***
+
+#### **4.3.8 Close Salon with Reason**
+
+**Endpoint:** `PUT /api/salons/:id/close-with-reason`  
+**Access:** Private (Owner)  
+**Description:** Close salon with reason, notify customers in queue [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Request:**
+```javascript
+{
+  "reason": "Emergency closure",
+  "customReason": "Unexpected maintenance required"
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Salon closed successfully",
+  "queueSizeCancelled": 5,
+  "notificationsSent": 5
+}
+```
+
+**Side Effects:**
+- Sets `isOpen: false`
+- Cancels all pending bookings
+- Sends FCM notifications to affected customers
+- Logs closure in `salon.closureHistory` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+#### **4.3.9 Set Busy Mode**
+
+**Endpoint:** `PUT /api/salons/:id/set-busy-mode`  
+**Access:** Private (Owner/Manager)  
+**Description:** Toggle busy mode (blocks online bookings, walk-ins only) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Request:**
+```javascript
+{
+  "busyMode": true
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Busy mode enabled",
+  "busyMode": true
+}
+```
+
+***
+
+#### **4.3.10 Service Management**
+
+**Add Service:**  
+`POST /api/salons/:id/services` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Update Service:**  
+`PUT /api/salons/:id/services/:serviceId` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Delete Service:**  
+`DELETE /api/salons/:id/services/:serviceId` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+#### **4.3.11 Get Salon Dashboard Stats**
+
+**Endpoint:** `GET /api/salons/:salonId/dashboard` or `GET /api/dashboard/:salonId`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Get real-time dashboard statistics [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  
+  // Simple dashboard metrics
+  "customersServedYesterday": 18,
+  "percentageChange": 12,  // % change from previous day
+  "waitAccuracy": 85,      // % of wait time estimates within 10% margin
+  "noShowRate": 5,         // % of scheduled bookings that didn't arrive
+  "peakHours": "2:00 PM – 4:00 PM",
+  
+  // Complex dashboard metrics
+  "inQueue": 3,
+  "inService": 2,
+  "activeBarbers": 3,
+  "avgWait": 25,           // minutes
+  "customersServed": 22,   // today
+  "completedServices": 45, // today
+  "walkInsToday": 15,
+  "isOpen": true,
+  "salonName": "StyleHub Men's Salon",
+  "address": "Andheri, MH",
+  "city": "Mumbai",
+  "state": "MH",
+  
+  // Scheduled bookings
+  "scheduledToday": 8,
+  "scheduledPending": 3,
+  "scheduledArrived": 4,
+  "scheduledNoShow": 1,
+  
+  // Additional stats
+  "avgServiceTime": 30,
+  "queueTrend": "+2",      // Change from 1 hour ago
+  "todayRevenue": null     // Future feature
+}
+```
+
+
+***
+
+#### **4.3.12 Get Queue Status for Closure**
+
+**Endpoint:** `GET /api/salons/:id/queue-status`  
+**Access:** Private (Owner)  
+**Description:** Check current queue before closing salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "queueSize": 5,
+  "inProgressCount": 2,
+  "pendingCount": 3,
+  "canClose": false,  // false if queue > 0
+  "message": "5 customers currently in queue"
+}
+```
+
+***
+
+#### **4.3.13 Get Priority Count Today**
+
+**Endpoint:** `GET /api/salons/:salonId/priority-count-today`  
+**Access:** Private (Owner/Manager)  
+**Description:** Check remaining priority insertions for today [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "used": 3,
+  "limit": 5,
+  "remaining": 2
+}
+```
+
+***
+
+#### **4.3.14 Update Salon Settings**
+
+**Endpoint:** `PUT /api/salons/:id/settings`  
+**Access:** Private (Owner)  
+**Description:** Update account settings [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Request:**
+```javascript
+{
+  "operatingMode": "normal",  // normal|busy|closed
+  "autoAcceptBookings": true,
+  "notificationPreferences": {
+    "newBookings": true,
+    "queueUpdates": true,
+    "customerMessages": true,
+    "promotions": false,
+    "pushEnabled": true
+  }
+}
+```
+
+***
+
+#### **4.3.15 Admin: Toggle Staff System**
+
+**Endpoint:** `PUT /api/salons/:id/staff-system`  
+**Access:** Private (Admin)  
+**Description:** Enable/disable staff management feature for salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Request:**
+```javascript
+{
+  "staffSystemEnabled": true
+}
+```
+
+***
+
+#### **4.3.16 Admin: Toggle Location Edit Permission**
+
+**Endpoint:** `PUT /api/salons/:id/toggle-location-edit`  
+**Access:** Private (Admin)  
+**Description:** Allow/block salon from editing location [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+### **4.4 BOOKING & QUEUE APIS**
+
+#### **4.4.1 Join Queue (Immediate Booking)**
+
+**Endpoint:** `POST /api/bookings/join-queue`  
+**Access:** Private (Customer)  
+**Description:** Join salon queue immediately [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Request:**
+```javascript
+{
+  "salonId": "60d5f484f1b2c72d88f8a1b2",
+  "services": [
+    {
+      "serviceId": "60d5f484f1b2c72d88f8a1b3",
+      "name": "Haircut",
+      "price": 300,
+      "duration": 30
+    },
+    {
+      "serviceId": "60d5f484f1b2c72d88f8a1b4",
+      "name": "Beard Trim",
+      "price": 150,
+      "duration": 15
+    }
+  ],
+  "notes": "Please use trimmer #2",
+  "paymentMethod": "cash"  // cash|card|upi|wallet
+}
+```
+
+**Response (201):**
+```javascript
+{
+  "success": true,
+  "message": "Successfully joined the queue",
+  "booking": {
+    "_id": "...",
+    "userId": "...",
+    "salonId": {
+      "_id": "...",
+      "name": "StyleHub Men's Salon",
+      "location": { "address": "...", "city": "Mumbai", "phone": "+91..." }
+    },
+    "bookingType": "immediate",
+    "services": [ /* ... */ ],
+    "totalPrice": 450,
+    "totalDuration": 45,
+    "queuePosition": 4,
+    "estimatedStartTime": "2026-01-24T06:45:00.000Z",
+    "estimatedEndTime": "2026-01-24T07:30:00.000Z",
+    "status": "pending",
+    "joinedAt": "2026-01-24T06:00:00.000Z",
+    "paymentMethod": "cash",
+    "paymentStatus": "pending"
+  }
+}
+```
+
+**Side Effects:**
+- Increments `user.totalBookings`
+- Updates `salon.currentQueueSize`
+- Sends FCM notification to salon owner
+- Sends FCM notification to customer (queue position)
+- Emits Socket.IO event `queue_updated` to salon room
+- Broadcasts personalized wait time update to all clients watching salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Validation:**
+- Checks if salon `isOpen`
+- Checks if user already has active booking at salon
+- Validates services exist in salon's service list
+
+***
+
+#### **4.4.2 Schedule Booking**
+
+**Endpoint:** `POST /api/bookings/schedule`  
+**Access:** Private (Customer)  
+**Description:** Book appointment for future date/time [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Request:**
+```javascript
+{
+  "salonId": "...",
+  "services": [ /* same as 4.4.1 */ ],
+  "scheduledDate": "2026-01-25",  // YYYY-MM-DD
+  "scheduledTime": "14:30",       // HH:mm
+  "notes": "First time customer",
+  "paymentMethod": "cash"
+}
+```
+
+**Response (201):**
+```javascript
+{
+  "success": true,
+  "message": "Booking scheduled successfully",
+  "booking": {
+    "_id": "...",
+    "bookingType": "scheduled",
+    "scheduledDate": "2026-01-25T00:00:00.000Z",
+    "scheduledTime": "14:30",
+    "queuePosition": 0,  // Not in queue until arrived
+    "status": "pending",
+    "arrived": false,
+    // ... rest same as 4.4.1
+  }
+}
+```
+
+**Validation:**
+- Cannot schedule in the past
+- Checks for duplicate scheduled booking (same day, same salon) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+#### **4.4.3 Get Available Time Slots**
+
+**Endpoint:** `GET /api/bookings/available-slots/:salonId?date=2026-01-25`  
+**Access:** Private  
+**Description:** Get available 30-minute slots for a date [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "slots": [
+    { "time": "09:00", "available": true },
+    { "time": "09:30", "available": true },
+    { "time": "10:00", "available": false },
+    { "time": "10:30", "available": true },
+    // ...
+    { "time": "21:00", "available": true }
+  ],
+  "dayHours": {
+    "open": "09:00",
+    "close": "21:00"
+  }
+}
+```
+
+**Logic:**
+- Reads salon's operating hours for that day
+- Generates 30-minute slots
+- Marks slots as unavailable if already booked [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+#### **4.4.4 Get My Bookings**
+
+**Endpoint:** `GET /api/bookings/my-bookings`  
+**Access:** Private (Customer)  
+**Description:** Get all bookings for current user [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Query Parameters:**
+```
+status=pending      # Filter: pending|in-progress|completed|cancelled
+limit=20
+page=1
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "count": 15,
+  "bookings": [
+    {
+      "_id": "...",
+      "salonId": {
+        "_id": "...",
+        "name": "StyleHub Men's Salon",
+        "location": { "city": "Mumbai", "address": "..." },
+        "phone": "+91..."
+      },
+      "services": [ /* ... */ ],
+      "totalPrice": 450,
+      "queuePosition": 4,
+      "status": "pending",
+      "bookingType": "immediate",
+      "joinedAt": "2026-01-24T06:00:00.000Z",
+      "estimatedStartTime": "2026-01-24T06:45:00.000Z"
+    }
+  ]
+}
+```
+
+
+***
+
+#### **4.4.5 Get Booking by ID**
+
+**Endpoint:** `GET /api/bookings/:id`  
+**Access:** Private  
+**Description:** Get single booking details [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "booking": {
+    "_id": "...",
+    "userId": { "_id": "...", "name": "John Doe", "phone": "+91..." },
+    "salonId": { /* populated */ },
+    "assignedStaffId": { "_id": "...", "name": "Barber Name" },
+    "services": [ /* ... */ ],
+    "totalPrice": 450,
+    "totalDuration": 45,
+    "queuePosition": 4,
+    "status": "pending",
+    "joinedAt": "...",
+    "startedAt": null,
+    "completedAt": null,
+    "rating": null,
+    "review": null
+  }
+}
+```
+
+***
+
+#### **4.4.6 Get Salon Bookings (Owner View)**
+
+**Endpoint:** `GET /api/bookings/salon/:salonId`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Get all bookings for salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Query Parameters:**
+```
+status=pending      # Filter by status
+date=2026-01-24     # Filter by date
+limit=50
+page=1
+```
+
+**Response:** Similar to 4.4.4 but includes all customers' bookings
+
+***
+
+#### **4.4.7 Get Staff Bookings**
+
+**Endpoint:** `GET /api/bookings/staff/:staffId`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Get bookings assigned to specific staff member [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+#### **4.4.8 Cancel Booking**
+
+**Endpoint:** `PUT /api/bookings/:id/cancel`  
+**Access:** Private (Customer or Salon Owner)  
+**Description:** Cancel booking [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Request:**
+```javascript
+{
+  "reason": "Cannot make it on time"
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Booking cancelled successfully",
+  "booking": {
+    "_id": "...",
+    "status": "cancelled",
+    "cancellationReason": "Cannot make it on time"
+  }
+}
+```
+
+**Side Effects:**
+- Reorders queue positions for remaining bookings
+- Sends FCM notification to customer (if cancelled by owner)
+- Emits Socket.IO event `queue_updated`
+- Broadcasts updated wait times [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+#### **4.4.9 Start Booking**
+
+**Endpoint:** `PUT /api/bookings/:id/start`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Mark service as started [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "booking": {
+    "_id": "...",
+    "status": "in-progress",
+    "startedAt": "2026-01-24T06:45:00.000Z"
+  }
+}
+```
+
+**Side Effects:**
+- Sets `startedAt` timestamp
+- Sends FCM notification to customer [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+#### **4.4.10 Complete Booking**
+
+**Endpoint:** `PUT /api/bookings/:id/complete`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Mark service as completed [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "booking": {
+    "_id": "...",
+    "status": "completed",
+    "completedAt": "2026-01-24T07:30:00.000Z"
+  }
+}
+```
+
+**Side Effects:**
+- Sets `completedAt` timestamp
+- Increments `user.totalBookings`
+- Sends FCM notification to customer [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+#### **4.4.11 Complete Payment**
+
+**Endpoint:** `PUT /api/bookings/:id/complete-payment`  
+**Access:** Private (Owner/Manager)  
+**Description:** Mark payment as paid [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Request:**
+```javascript
+{
+  "paymentMethod": "cash",  // cash|card|upi|wallet
+  "paidAmount": 450,
+  "transactionId": "TXN123456"  // Optional
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Payment completed",
+  "booking": {
+    "_id": "...",
+    "paymentStatus": "paid",
+    "paidAmount": 450,
+    "paymentDate": "2026-01-24T07:30:00.000Z",
+    "transactionId": "TXN123456"
+  }
+}
+```
+
+***
+
+#### **4.4.12 Assign Staff to Booking**
+
+**Endpoint:** `PUT /api/bookings/:id/assign-staff`  
+**Access:** Private (Owner/Manager)  
+**Description:** Assign staff member to booking [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Request:**
+```javascript
+{
+  "staffId": "60d5f484f1b2c72d88f8a1b5"
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Staff assigned successfully",
+  "booking": {
+    "_id": "...",
+    "assignedStaffId": {
+      "_id": "60d5f484f1b2c72d88f8a1b5",
+      "name": "Barber John",
+      "role": "barber"
+    }
+  }
+}
+```
+
+***
+
+### **4.5 SCHEDULED BOOKING APIS**
+
+#### **4.5.1 Get Today's Scheduled Bookings**
+
+**Endpoint:** `GET /api/scheduled-bookings/:salonId/today`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Get all scheduled bookings for today [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "count": 8,
+  "bookings": [
+    {
+      "_id": "...",
+      "userId": { "name": "Jane Doe", "phone": "+91..." },
+      "scheduledTime": "14:30",
+      "services": [ /* ... */ ],
+      "totalPrice": 600,
+      "status": "pending",
+      "arrived": false,
+      "arrivedAt": null
+    }
+  ]
+}
+```
+
+
+***
+
+#### **4.5.2 Get Tomorrow's Scheduled Bookings**
+
+**Endpoint:** `GET /api/scheduled-bookings/:salonId/tomorrow`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Get tomorrow's scheduled bookings [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+***
+
+#### **4.5.3 Mark Scheduled Booking as Arrived**
+
+**Endpoint:** `PATCH /api/scheduled-bookings/:bookingId/mark-arrived`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Customer arrived, add to queue [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Scheduled booking marked as arrived and added to queue",
+  "booking": {
+    "_id": "...",
+    "arrived": true,
+    "arrivedAt": "2026-01-24T14:25:00.000Z",
+    "queuePosition": 3,  // Assigned queue position
+    "status": "pending"
+  }
+}
+```
+
+**Side Effects:**
+- Sets `arrived: true`, `arrivedAt`, `joinedAt`
+- Assigns queue position (end of current queue + 1)
+- Reorders queue to remove gaps
+- Emits Socket.IO event `queue_updated`
+- Broadcasts wait time update [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+***
+
+#### **4.5.4 Mark as No-Show**
+
+**Endpoint:** `PATCH /api/scheduled-bookings/:bookingId/no-show`  
+**Access:** Private (Owner/Manager)  
+**Description:** Customer didn't arrive [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Request:**
+```javascript
+{
+  "reason": "Customer did not arrive"
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Booking marked as no-show",
+  "booking": {
+    "_id": "...",
+    "status": "no-show"
+  }
+}
+```
+
+
+***
+
+### **4.6 STAFF MANAGEMENT APIS**
+
+#### **4.6.1 Get Staff by Salon**
+
+**Endpoint:** `GET /api/staff/salon/:salonId`  
+**Access:** Private (Owner/Manager)  
+**Description:** Get all staff members for salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "count": 5,
+  "staff": [
+    {
+      "_id": "...",
+      "name": "Barber John",
+      "email": "john@stylehub.com",
+      "phone": "+919876543210",
+      "profileImage": "https://...",
+      "role": "barber",
+      "specialization": ["haircut", "beard"],
+      "workingHours": { /* ... */ },
+      "commissionType": "percentage",
+      "commissionRate": 40,
+      "salary": 25000,
+      "stats": {
+        "totalBookings": 120,
+        "completedBookings": 115,
+        "totalRevenue": 54000,
+        "totalCommission": 21600,
+        "averageRating": 4.7,
+        "totalReviews": 98
+      },
+      "isActive": true,
+      "isAvailable": true,
+      "joinDate": "2025-06-15T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+
+***
+
+#### **4.6.2 Get Staff by ID**
+
+**Endpoint:** `GET /api/staff/:id`  
+**Access:** Private (Owner/Manager)  
+**Description:** Get single staff member details [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.6.3 Add Staff**
+
+**Endpoint:** `POST /api/staff`  
+**Access:** Private (Owner/Manager)  
+**Description:** Add new staff member [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
+```javascript
+{
+  "name": "Barber Mike",
+  "email": "mike@stylehub.com",
+  "phone": "+919876543211",
+  "salonId": "60d5f484f1b2c72d88f8a1b2",
+  "role": "barber",  // barber|stylist|manager|receptionist
+  "specialization": ["haircut", "coloring"],
+  "workingHours": {
+    "monday": { "isWorking": true, "start": "09:00", "end": "18:00" },
+    // ... all 7 days
+  },
+  "commissionType": "percentage",  // percentage|fixed|none
+  "commissionRate": 40,             // 40% or ₹100 per service
+  "salary": 25000
+}
+```
+
+**Response (201):**
+```javascript
+{
+  "success": true,
+  "message": "Staff added successfully",
+  "staff": { /* created staff object */ }
+}
+```
+
+
+***
+
+#### **4.6.4 Update Staff**
+
+**Endpoint:** `PUT /api/staff/:id`  
+**Access:** Private (Owner/Manager)  
+**Description:** Update staff details [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.6.5 Delete Staff**
+
+**Endpoint:** `DELETE /api/staff/:id`  
+**Access:** Private (Owner/Manager)  
+**Description:** Soft delete staff (marks `isActive: false`) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.6.6 Bulk Delete Staff**
+
+**Endpoint:** `POST /api/staff/bulk-delete`  
+**Access:** Private (Owner/Manager)  
+**Description:** Delete multiple staff members [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
+```javascript
+{
+  "staffIds": ["id1", "id2", "id3"]
+}
+```
+
+***
+
+#### **4.6.7 Bulk Update Status**
+
+**Endpoint:** `PUT /api/staff/bulk-status`  
+**Access:** Private (Owner/Manager)  
+**Description:** Enable/disable multiple staff [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
+```javascript
+{
+  "staffIds": ["id1", "id2"],
+  "isActive": false
+}
+```
+
+***
+
+#### **4.6.8 Toggle Availability**
+
+**Endpoint:** `PUT /api/staff/:id/availability`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Set staff as available/unavailable for new bookings [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
+```javascript
+{
+  "isAvailable": false
+}
+```
+
+***
+
+#### **4.6.9 Check Staff Availability**
+
+**Endpoint:** `GET /api/staff/:id/availability`  
+**Access:** Private  
+**Description:** Check if staff is currently available [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "staff": {
+    "_id": "...",
+    "name": "Barber John",
+    "isAvailable": true,
+    "currentBookings": 2,
+    "nextAvailable": "2026-01-24T08:00:00.000Z"
+  }
+}
+```
+
+***
+
+#### **4.6.10 Get Staff Performance**
+
+**Endpoint:** `GET /api/staff/:id/performance`  
+**Access:** Private (Owner/Manager)  
+**Description:** Get detailed performance metrics [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Query Parameters:**
+```
+startDate=2026-01-01
+endDate=2026-01-31
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "staff": { "name": "Barber John", "_id": "..." },
+  "period": { "startDate": "2026-01-01", "endDate": "2026-01-31" },
+  "metrics": {
+    "totalBookings": 45,
+    "completedBookings": 42,
+    "cancelledBookings": 3,
+    "totalRevenue": 18900,
+    "totalCommission": 7560,
+    "averageRating": 4.7,
+    "totalReviews": 38,
+    "avgServiceTime": 32,  // minutes
+    "popularServices": [
+      { "service": "Haircut", "count": 30 },
+      { "service": "Beard Trim", "count": 15 }
+    ]
+  }
+}
+```
+
+
+***
+
+### **4.7 DASHBOARD & REPORTS APIS**
+
+#### **4.7.1 Daily Summary Report**
+
+**Endpoint:** `GET /api/reports/daily-summary`  
+**Access:** Private (Owner/Manager)  
+**Description:** Get today's summary for salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Query Parameters:**
+```
+salonId=60d5f484f1b2c72d88f8a1b2
+date=2026-01-24  # Optional, defaults to today
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "date": "2026-01-24",
+  "summary": {
+    "totalBookings": 28,
+    "completedBookings": 22,
+    "cancelledBookings": 3,
+    "noShowBookings": 2,
+    "inProgressBookings": 1,
+    "walkInBookings": 15,
+    "scheduledBookings": 13,
+    "totalRevenue": 9450,
+    "avgServiceTime": 28,
+    "peakHour": "14:00"
+  }
+}
+```
+
+
+***
+
+#### **4.7.2 Staff Performance Report**
+
+**Endpoint:** `GET /api/reports/staff-performance`  
+**Access:** Private (Owner/Manager)  
+**Description:** Compare staff performance [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Query Parameters:**
+```
+salonId=...
+startDate=2026-01-01
+endDate=2026-01-31
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "period": { "startDate": "2026-01-01", "endDate": "2026-01-31" },
+  "staffPerformance": [
+    {
+      "staffId": "...",
+      "name": "Barber John",
+      "totalBookings": 120,
+      "completedBookings": 115,
+      "revenue": 54000,
+      "commission": 21600,
+      "rating": 4.7,
+      "avgServiceTime": 30
+    },
+    // ... more staff
+  ]
+}
+```
+
+
+***
+
+#### **4.7.3 Revenue Report**
+
+**Endpoint:** `GET /api/reports/revenue`  
+**Access:** Private (Owner/Manager)  
+**Description:** Revenue breakdown [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Query Parameters:**
+```
+salonId=...
+startDate=2026-01-01
+endDate=2026-01-31
+groupBy=day  # day|week|month
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "period": { "startDate": "2026-01-01", "endDate": "2026-01-31" },
+  "totalRevenue": 125000,
+  "breakdown": [
+    { "date": "2026-01-01", "revenue": 4200, "bookings": 18 },
+    { "date": "2026-01-02", "revenue": 3800, "bookings": 16 },
+    // ...
+  ],
+  "topServices": [
+    { "service": "Haircut", "revenue": 60000, "count": 200 },
+    { "service": "Beard Trim", "revenue": 25000, "count": 167 }
+  ]
+}
+```
+
+
+***
+
+### **4.8 REVIEW APIS**
+
+#### **4.8.1 Submit Review**
+
+**Endpoint:** `POST /api/reviews/booking/:bookingId`  
+**Access:** Private (Customer)  
+**Description:** Rate and review completed booking [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Request:**
+```javascript
+{
+  "rating": 5,  // 1-5 required
+  "review": "Excellent service! Will come again."  // Optional
+}
+```
+
+**Response (200):**
+```javascript
 {
   "success": true,
   "message": "Review submitted successfully",
-  "data": {
-    "review": {
-      "_id": "507f1f77bcf86cd799439060",
-      "user": {
-        "_id": "507f1f77bcf86cd799439011",
-        "name": "John Doe",
-        "profileImage": "https://cloudinary.com/user.jpg"
-      },
-      "salon": "507f1f77bcf86cd799439012",
-      "booking": "507f1f77bcf86cd799439050",
+  "booking": {
+    "_id": "...",
+    "rating": 5,
+    "review": "Excellent service! Will come again.",
+    "reviewedAt": "2026-01-24T08:00:00.000Z"
+  }
+}
+```
+
+**Side Effects:**
+- Updates `salon.averageRating` and `salon.totalReviews`
+- If booking had `assignedStaffId`, updates staff rating [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Validation:**
+- Only completed bookings can be reviewed
+- Rating between 1-5
+- User must own the booking
+- Can only review once (can update with PUT)
+
+***
+
+#### **4.8.2 Get Salon Reviews**
+
+**Endpoint:** `GET /api/reviews/salon/:salonId`  
+**Access:** Public  
+**Description:** Get all reviews for salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Query Parameters:**
+```
+page=1
+limit=10
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "count": 10,
+  "total": 128,
+  "page": 1,
+  "pages": 13,
+  "reviews": [
+    {
+      "_id": "...",
+      "userId": { "name": "John Doe", "phone": "+91..." },
       "rating": 5,
-      "comment": "Excellent service! Very professional staff and great ambiance.",
-      "categories": {
-        "ambiance": 5,
-        "service": 5,
-        "value": 4
-      },
-      "images": ["https://cloudinary.com/review-img1.jpg"],
-      "isVerified": true,
-      "helpful": 0,
-      "createdAt": "2025-12-12T23:55:00.000Z"
-    },
-    "salonRating": {
-      "newAverage": 4.6,
-      "totalReviews": 121
+      "review": "Great service!",
+      "reviewedAt": "2026-01-24T08:00:00.000Z",
+      "services": [ { "name": "Haircut", "price": 300 } ],
+      "totalPrice": 300
     }
-  }
+  ],
+  "ratingBreakdown": [
+    { "_id": 5, "count": 85 },
+    { "_id": 4, "count": 30 },
+    { "_id": 3, "count": 10 },
+    { "_id": 2, "count": 2 },
+    { "_id": 1, "count": 1 }
+  ]
 }
 ```
 
-#### Error Responses
-
-**Already Reviewed (409)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "REVIEW_ALREADY_EXISTS",
-    "message": "You have already reviewed this booking"
-  }
-}
-```
-
-**Booking Not Completed (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "BOOKING_NOT_COMPLETED",
-    "message": "You can only review completed bookings"
-  }
-}
-```
-
-#### Related Models
-- **Review Model:** Creates new review document
-- **Booking Model:** Links review to booking
-- **Salon Model:** Updates aggregated rating
-
-#### Frontend Notes
-- Show review form after booking completion
-- Implement star rating component
-- Allow image upload (before/after photos)
-- Show character count for comment
-- Disable submit if rating not selected
-- Show preview before submitting
-
-#### Edge Cases
-- User tries to review without booking → Allow but mark as unverified
-- User submits review multiple times → Prevent duplicates
-- Salon deleted after booking → Allow review but mark salon as deleted
 
 ***
 
-### 25. Get Salon Reviews
+#### **4.8.3 Get My Reviews**
 
-**Endpoint:** Retrieve reviews for a salon
+**Endpoint:** `GET /api/reviews/my-reviews`  
+**Access:** Private (Customer)  
+**Description:** Get all reviews written by current user [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
 
-**HTTP Method:** `GET`
+***
 
-**Route:** `/api/reviews/salon/:salonId`
+#### **4.8.4 Update Review**
 
-**Access Level:** Public
+**Endpoint:** `PUT /api/reviews/booking/:bookingId`  
+**Access:** Private (Customer)  
+**Description:** Edit existing review [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
 
-**Authentication Required:** No
+***
 
-#### Path Parameters
+### **4.9 FAVORITES APIS**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | Salon ID |
+#### **4.9.1 Get Favorites**
 
-#### Query Parameters
+**Endpoint:** `GET /api/favorites`  
+**Access:** Private (Customer)  
+**Description:** Get user's favorite salons [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| page | Number | No | 1 | Page number |
-| limit | Number | No | 10 | Results per page |
-| sortBy | String | No | createdAt | Sort by: createdAt, rating, helpful |
-| rating | Number | No | - | Filter by rating (1-5) |
-
-#### Example Request
-```http
-GET /api/reviews/salon/507f1f77bcf86cd799439012?page=1&limit=10&sortBy=helpful
-```
-
-#### Business Logic
-
-1. Validate salonId
-2. Query reviews for this salon
-3. Filter by rating if provided
-4. Populate user details (name, profileImage)
-5. Sort by specified field
-6. Paginate results
-7. Calculate rating distribution
-8. Return reviews with summary
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "data": {
-    "reviews": [
-      {
-        "_id": "507f1f77bcf86cd799439060",
-        "user": {
-          "_id": "507f1f77bcf86cd799439011",
-          "name": "John Doe",
-          "profileImage": "https://cloudinary.com/user.jpg"
-        },
-        "rating": 5,
-        "comment": "Excellent service! Very professional staff.",
-        "categories": {
-          "ambiance": 5,
-          "service": 5,
-          "value": 4
-        },
-        "images": ["https://cloudinary.com/review-img1.jpg"],
-        "isVerified": true,
-        "helpful": 12,
-        "createdAt": "2025-12-10T14:30:00.000Z"
-      }
-    ],
-    "pagination": {
-      "currentPage": 1,
-      "totalPages": 12,
-      "totalItems": 120,
-      "itemsPerPage": 10
-    },
-    "summary": {
+  "count": 3,
+  "favorites": [
+    {
+      "_id": "...",
+      "name": "StyleHub Men's Salon",
+      "location": { "city": "Mumbai", "address": "..." },
       "averageRating": 4.5,
-      "totalReviews": 120,
-      "ratingDistribution": {
-        "5": 70,
-        "4": 35,
-        "3": 10,
-        "2": 3,
-        "1": 2
-      },
-      "categoryAverages": {
-        "ambiance": 4.6,
-        "service": 4.5,
-        "value": 4.3
-      }
+      "totalReviews": 128,
+      "profileImage": "https://..."
     }
-  }
+  ]
 }
 ```
 
-#### Frontend Notes
-- Show rating distribution histogram
-- Display verified badge for reviews with booking
-- Implement "helpful" button (upvote reviews)
-- Show review images in gallery
-- Filter by star rating
-- Sort by most helpful/recent
 
 ***
 
-### 26. Update Review
+#### **4.9.2 Add to Favorites**
 
-**Endpoint:** Edit existing review
+**Endpoint:** `POST /api/favorites/:salonId`  
+**Access:** Private (Customer)  
+**Description:** Add salon to favorites [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**HTTP Method:** `PUT`
-
-**Route:** `/api/reviews/:reviewId`
-
-**Access Level:** Authenticated User (own review)
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| reviewId | ObjectId | Yes | Review ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body
-```json
-{
-  "rating": 4,
-  "comment": "Updated review after revisit",
-  "categories": {
-    "ambiance": 4,
-    "service": 4,
-    "value": 4
-  }
-}
-```
-
-#### Business Logic
-
-1. Find review by ID
-2. Verify review belongs to authenticated user
-3. Check if review is within edit window (e.g., 30 days)
-4. Update provided fields
-5. Recalculate salon's average rating
-6. Add to edit history (optional)
-7. Return updated review
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "message": "Review updated successfully",
-  "data": {
-    "review": {
-      "_id": "507f1f77bcf86cd799439060",
-      "rating": 4,
-      "comment": "Updated review after revisit",
-      "updatedAt": "2025-12-12T23:55:00.000Z",
-      "isEdited": true
-    }
-  }
+  "message": "Added to favorites"
 }
 ```
 
-#### Error Responses
-
-**Edit Window Expired (422)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "EDIT_WINDOW_EXPIRED",
-    "message": "Reviews can only be edited within 30 days of submission"
-  }
-}
-```
-
-#### Notes
-- Mark review as "edited"
-- Allow editing within 30 days
-- Consider storing edit history
 
 ***
 
-### 27. Delete Review
+#### **4.9.3 Remove from Favorites**
 
-**Endpoint:** Delete a review
-
-**HTTP Method:** `DELETE`
-
-**Route:** `/api/reviews/:reviewId`
-
-**Access Level:** Authenticated User (own review), Admin
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| reviewId | ObjectId | Yes | Review ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Business Logic
-
-1. Find review by ID
-2. Verify user owns review OR is admin
-3. Delete review document
-4. Recalculate salon's average rating
-5. Remove review reference from booking
-6. Delete review images from Cloudinary
-7. Return success
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Review deleted successfully",
-  "data": {
-    "deleted": true
-  }
-}
-```
-
-#### Notes
-- Soft delete recommended (mark as deleted)
-- Update salon rating immediately
-- Consider preventing deletion if review is old (>90 days)
+**Endpoint:** `DELETE /api/favorites/:salonId`  
+**Access:** Private (Customer)  
+**Description:** Remove salon from favorites [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
 ***
 
-### 28. Mark Review as Helpful
+#### **4.9.4 Check if Favorite**
 
-**Endpoint:** Upvote a review
+**Endpoint:** `GET /api/favorites/check/:salonId`  
+**Access:** Private (Customer)  
+**Description:** Check if salon is in favorites [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**HTTP Method:** `PATCH`
-
-**Route:** `/api/reviews/:reviewId/helpful`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| reviewId | ObjectId | Yes | Review ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Business Logic
-
-1. Find review by ID
-2. Check if user already marked this review as helpful
-3. If yes → remove helpful (toggle)
-4. If no → add user to helpful list
-5. Increment/decrement helpful counter
-6. Return updated count
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "message": "Review marked as helpful",
-  "data": {
-    "helpful": 13,
-    "userMarkedHelpful": true
-  }
-}
-```
-
-#### Notes
-- Implement toggle behavior (click again to undo)
-- Store user IDs who marked helpful (prevent spam)
-- Use atomic increment for counter
-
-***
-
-## Favorite APIs
-
-### 29. Add to Favorites
-
-**Endpoint:** Add salon to user's favorites
-
-**HTTP Method:** `POST`
-
-**Route:** `/api/favorites`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body
-```json
-{
-  "salonId": "507f1f77bcf86cd799439012"
-}
-```
-
-#### Business Logic
-
-1. Validate salonId exists
-2. Check if salon already in user's favorites
-3. Add salon to user's favorites array (in User model or separate Favorite model)
-4. Increment salon's favorite count
-5. Return success
-
-#### Success Response
-
-**Status Code:** `201 Created`
-
-```json
-{
-  "success": true,
-  "message": "Salon added to favorites",
-  "data": {
-    "favoriteCount": 6,
-    "isFavorite": true
-  }
-}
-```
-
-#### Error Responses
-
-**Already Favorited (409)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ALREADY_FAVORITED",
-    "message": "Salon is already in your favorites"
-  }
+  "isFavorite": true
 }
 ```
 
 ***
 
-### 30. Remove from Favorites
+### **4.10 ANALYTICS APIS**
 
-**Endpoint:** Remove salon from favorites
+#### **4.10.1 Get Salon Analytics**
 
-**HTTP Method:** `DELETE`
+**Endpoint:** `GET /api/analytics/salon/:salonId`  
+**Access:** Private (Owner)  
+**Description:** Get analytics for salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**Route:** `/api/favorites/:salonId`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | Salon ID |
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
+**Query Parameters:**
+```
+period=7d  # 24h|7d|30d
 ```
 
-#### Business Logic
-
-1. Remove salon from user's favorites array
-2. Decrement salon's favorite count
-3. Return success
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
-  "message": "Salon removed from favorites",
-  "data": {
-    "favoriteCount": 5,
-    "isFavorite": false
-  }
-}
-```
-
-***
-
-### 31. Get User Favorites
-
-**Endpoint:** Retrieve user's favorite salons
-
-**HTTP Method:** `GET`
-
-**Route:** `/api/favorites`
-
-**Access Level:** Authenticated User
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| latitude | Number | No | - | User latitude for distance |
-| longitude | Number | No | - | User longitude for distance |
-
-#### Business Logic
-
-1. Extract userId from token
-2. Find user's favorite salon IDs
-3. Fetch full salon details for each favorite
-4. Calculate distance if coordinates provided
-5. Calculate current wait time for each salon
-6. Return salon list
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "data": {
-    "favorites": [
-      {
-        "_id": "507f1f77bcf86cd799439012",
-        "name": "Elite Hair Studio",
-        "location": {
-          "address": "123 MG Road, Bangalore"
-        },
-        "distance": 2.5,
-        "rating": {
-          "average": 4.5,
-          "count": 120
-        },
-        "waitTime": 25,
-        "isOpen": true,
-        "images": ["https://cloudinary.com/salon1.jpg"]
-      }
-    ],
-    "totalFavorites": 5
-  }
-}
-```
-
-#### Frontend Notes
-- Show empty state with "Browse salons" CTA
-- Display distance if location available
-- Show live wait time
-- Enable quick booking from favorites
-- Implement swipe-to-delete
-
-***
-
-## Analytics APIs
-
-### 32. Get Salon Analytics (Owner Only)
-
-**Endpoint:** Retrieve analytics for salon owner
-
-**HTTP Method:** `GET`
-
-**Route:** `/api/analytics/salon/:salonId`
-
-**Access Level:** Salon Owner (own salon), Admin
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | Salon ID |
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| startDate | Date | No | 30 days ago | Start date for analytics |
-| endDate | Date | No | Now | End date for analytics |
-| groupBy | String | No | day | Group by: day, week, month |
-
-#### Example Request
-```http
-GET /api/analytics/salon/507f1f77bcf86cd799439012?startDate=2025-11-01&endDate=2025-12-12&groupBy=week
-```
-
-#### Business Logic
-
-1. Verify user owns this salon OR is admin
-2. Query bookings for date range
-3. Aggregate data:
-   - Total bookings by status
-   - Revenue (completed bookings)
-   - Average wait time
-   - Peak hours
-   - Popular services
-   - Customer retention rate
-   - Average rating over time
-4. Group data by specified period
-5. Return analytics
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "data": {
-    "summary": {
-      "totalBookings": 245,
-      "completedBookings": 220,
-      "cancelledBookings": 15,
-      "noShowBookings": 10,
-      "totalRevenue": 148500,
-      "averageBookingValue": 675,
-      "averageRating": 4.5,
-      "totalReviews": 120,
-      "uniqueCustomers": 180,
-      "returningCustomers": 65,
-      "customerRetentionRate": 36.1
+  "analytics": {
+    "overview": {
+      "totalBookings": 156,
+      "completedBookings": 142,
+      "cancelledBookings": 12,
+      "totalRevenue": 63600,
+      "averageRating": 4.6
     },
-    "timeSeriesData": [
-      {
-        "period": "2025-11-18",
-        "bookings": 35,
-        "revenue": 21000,
-        "averageWaitTime": 28,
-        "cancelledBookings": 2
-      },
-      {
-        "period": "2025-11-25",
-        "bookings": 42,
-        "revenue": 25200,
-        "averageWaitTime": 32,
-        "cancelledBookings": 1
-      }
-    ],
     "popularServices": [
-      {
-        "serviceId": "507f1f77bcf86cd799439030",
-        "serviceName": "Men's Haircut",
-        "bookingCount": 120,
-        "revenue": 36000,
-        "percentage": 48.9
-      },
-      {
-        "serviceId": "507f1f77bcf86cd799439031",
-        "serviceName": "Hair Coloring",
-        "bookingCount": 65,
-        "revenue": 97500,
-        "percentage": 26.5
-      }
+      { "name": "Haircut", "count": 95 },
+      { "name": "Beard Trim", "count": 78 },
+      { "name": "Hair Coloring", "count": 32 }
     ],
-    "peakHours": [
-      {
-        "hour": 14,
-        "bookingCount": 45,
-        "label": "2 PM - 3 PM"
-      },
-      {
-        "hour": 18,
-        "bookingCount": 52,
-        "label": "6 PM - 7 PM"
-      }
-    ],
-    "ratingTrend": [
-      {
-        "period": "2025-11",
-        "averageRating": 4.3,
-        "reviewCount": 38
-      },
-      {
-        "period": "2025-12",
-        "averageRating": 4.6,
-        "reviewCount": 42
-      }
-    ],
-    "dateRange": {
-      "startDate": "2025-11-01T00:00:00.000Z",
-      "endDate": "2025-12-12T23:59:59.999Z"
-    }
+    "dailyStats": [
+      { "_id": "2026-01-18", "bookings": 22, "revenue": 9240 },
+      { "_id": "2026-01-19", "bookings": 20, "revenue": 8400 },
+      // ... last 7 days
+    ]
   }
 }
 ```
 
-#### Frontend Notes
-- Display charts for time series data (line/bar charts)
-- Show pie chart for popular services
-- Highlight peak hours for capacity planning
-- Show trend indicators (↑↓ compared to previous period)
-- Enable date range picker
-- Export analytics as PDF/CSV
 
 ***
 
-### 33. Get Booking Statistics (Owner Only)
+### **4.11 ADMIN APIS**
 
-**Endpoint:** Detailed booking statistics
+#### **4.11.1 Get Platform Statistics**
 
-**HTTP Method:** `GET`
+**Endpoint:** `GET /api/admin/statistics`  
+**Access:** Private (Admin)  
+**Description:** Platform-wide statistics [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**Route:** `/api/analytics/salon/:salonId/bookings`
-
-**Access Level:** Salon Owner (own salon), Admin
-
-**Authentication Required:** Yes
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
   "data": {
-    "bookingStats": {
-      "totalBookings": 245,
-      "statusBreakdown": {
-        "pending": 5,
-        "inProgress": 1,
-        "completed": 220,
-        "cancelled": 15,
-        "noShow": 10
-      },
-      "cancellationRate": 6.1,
-      "noShowRate": 4.1,
-      "completionRate": 89.8,
-      "averageServiceTime": 42,
-      "averageWaitTime": 28
-    },
-    "customerStats": {
-      "uniqueCustomers": 180,
-      "newCustomers": 115,
-      "returningCustomers": 65,
-      "averageBookingsPerCustomer": 1.36
-    },
-    "revenueStats": {
-      "totalRevenue": 148500,
-      "averageRevenuePerBooking": 675,
-      "projectedMonthlyRevenue": 185000
-    }
-  }
-}
-```
-
-***
-
-## Admin APIs
-
-### 34. Get Platform Statistics (Admin Only)
-
-**Endpoint:** Platform-wide analytics for admins
-
-**HTTP Method:** `GET`
-
-**Route:** `/api/admin/statistics`
-
-**Access Level:** Admin
-
-**Authentication Required:** Yes
-
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-#### Business Logic
-
-1. Verify user role is "admin"
-2. Aggregate platform-wide statistics:
-   - Total users, salons, bookings
-   - Active users (logged in last 30 days)
-   - Revenue by salon
-   - Growth metrics
-   - Top-rated salons
-3. Return comprehensive statistics
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
-{
-  "success": true,
-  "data": {
-    "platformStats": {
-      "totalUsers": 15420,
-      "totalSalons": 342,
-      "totalBookings": 28750,
-      "totalRevenue": 15250000,
-      "activeUsers": 8920,
+    "overview": {
+      "totalUsers": 12458,
+      "totalSalons": 324,
+      "totalBookings": 45678,
       "activeSalons": 298,
-      "averageRating": 4.3
+      "activeUsers": 8932  // Active in last 30 days
     },
-    "growth": {
-      "newUsersThisMonth": 1250,
-      "newSalonsThisMonth": 28,
-      "bookingsGrowth": 12.5,
-      "revenueGrowth": 18.3
+    "revenue": {
+      "total": 12456789,
+      "completedBookings": 42156
     },
+    "topCities": [
+      { "city": "Mumbai", "bookingCount": 15678 },
+      { "city": "Delhi", "bookingCount": 12345 },
+      { "city": "Bangalore", "bookingCount": 9876 }
+    ],
     "topSalons": [
       {
-        "salonId": "507f1f77bcf86cd799439012",
-        "name": "Elite Hair Studio",
-        "totalBookings": 520,
-        "revenue": 350000,
-        "rating": 4.8
-      }
-    ],
-    "topCities": [
-      {
-        "city": "Bangalore",
-        "salonCount": 145,
-        "bookingCount": 12500
-      },
-      {
+        "salonId": "...",
+        "salonName": "StyleHub Premium",
         "city": "Mumbai",
-        "salonCount": 98,
-        "bookingCount": 8900
+        "totalRevenue": 456789,
+        "bookingCount": 1245
       }
     ]
   }
 }
 ```
 
-#### Error Responses
-
-**Unauthorized (403)**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ADMIN_ACCESS_REQUIRED",
-    "message": "This endpoint requires admin privileges"
-  }
-}
-```
 
 ***
 
-### 35. Get All Users (Admin Only)
+#### **4.11.2 Get Users**
 
-**Endpoint:** Retrieve all users with filters
+**Endpoint:** `GET /api/admin/users`  
+**Access:** Private (Admin)  
+**Description:** List all users with filtering [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**HTTP Method:** `GET`
+**Query Parameters:**
+```
+page=1
+limit=20
+search=John             # Search name/phone/email
+role=customer           # Filter by role
+isActive=true           # Filter by active status
+```
 
-**Route:** `/api/admin/users`
-
-**Access Level:** Admin
-
-**Authentication Required:** Yes
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| page | Number | No | 1 | Page number |
-| limit | Number | No | 50 | Results per page |
-| role | String | No | - | Filter by role |
-| search | String | No | - | Search by name, email, phone |
-| sortBy | String | No | createdAt | Sort field |
-| sortOrder | String | No | desc | asc or desc |
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
   "data": {
     "users": [
       {
-        "_id": "507f1f77bcf86cd799439011",
+        "_id": "...",
         "name": "John Doe",
-        "email": "john@example.com",
         "phone": "+919876543210",
-        "role": "user",
-        "isVerified": true,
+        "email": "john@example.com",
+        "role": "customer",
+        "isActive": true,
         "totalBookings": 12,
-        "lastLogin": "2025-12-12T20:00:00.000Z",
-        "createdAt": "2025-01-15T00:00:00.000Z"
+        "loyaltyPoints": 150,
+        "createdAt": "2025-06-15T10:30:00.000Z",
+        "lastLogin": "2026-01-24T05:00:00.000Z"
       }
     ],
     "pagination": {
       "currentPage": 1,
-      "totalPages": 308,
-      "totalItems": 15420,
-      "itemsPerPage": 50
+      "totalPages": 623,
+      "totalUsers": 12458,
+      "limit": 20
     }
   }
 }
 ```
 
+
 ***
 
-### 36. Delete User (Admin Only)
+#### **4.11.3 Get User Details**
 
-**Endpoint:** Delete a user account
+**Endpoint:** `GET /api/admin/users/:userId`  
+**Access:** Private (Admin)  
+**Description:** Get detailed user information [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**HTTP Method:** `DELETE`
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "data": {
+    "user": { /* full user object */ },
+    "stats": {
+      "totalBookings": 45,
+      "completedBookings": 42,
+      "cancelledBookings": 3,
+      "totalSpent": 18900
+    }
+  }
+}
+```
 
-**Route:** `/api/admin/users/:userId`
 
-**Access Level:** Admin
+***
 
-**Authentication Required:** Yes
+#### **4.11.4 Soft Delete User**
 
-#### Path Parameters
+**Endpoint:** `DELETE /api/admin/users/:userId`  
+**Access:** Private (Admin)  
+**Description:** Deactivate user account and cancel active bookings [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| userId | ObjectId | Yes | User ID to delete |
+**Request:**
+```javascript
+{
+  "reason": "Violating terms of service"
+}
+```
 
-#### Business Logic
-
-1. Verify admin role
-2. Find user by ID
-3. Cancel all active bookings
-4. Soft delete or permanently delete based on policy
-5. Anonymize user data in reviews
-6. Return success
-
-#### Success Response
-
-**Status Code:** `200 OK`
-
-```json
+**Response (200):**
+```javascript
 {
   "success": true,
   "message": "User deleted successfully",
   "data": {
-    "deleted": true,
-    "affectedBookings": 2
+    "userId": "...",
+    "cancelledBookings": 2
   }
+}
+```
+
+**Side Effects:**
+- Sets `isActive: false`
+- Anonymizes name to `[Deleted User] <userId>`
+- Clears email and FCM token
+- Cancels all active bookings
+- Logs action to AdminAuditLog [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.11.5 Restore User**
+
+**Endpoint:** `PATCH /api/admin/users/:userId/restore`  
+**Access:** Private (Admin)  
+**Description:** Reactivate deleted user account [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.11.6 Get Cities**
+
+**Endpoint:** `GET /api/admin/salons/cities`  
+**Access:** Private (Admin)  
+**Description:** Get list of all cities with active salons [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "cities": ["Ahmedabad", "Bangalore", "Chennai", "Delhi", "Mumbai", "Pune"]
 }
 ```
 
 ***
 
-### 37. Verify Salon (Admin Only)
+#### **4.11.7 Get Salons**
 
-**Endpoint:** Verify/approve a salon
+**Endpoint:** `GET /api/admin/salons`  
+**Access:** Private (Admin)  
+**Description:** List all salons with filtering [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**HTTP Method:** `PATCH`
+**Query Parameters:**
+```
+page=1
+limit=20
+city=Mumbai
+verified=true           # Filter by verification status
+status=active           # active|deleted
+search=StyleHub         # Search name/city/address
+```
 
-**Route:** `/api/admin/salons/:salonId/verify`
-
-**Access Level:** Admin
-
-**Authentication Required:** Yes
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| salonId | ObjectId | Yes | Salon ID |
-
-#### Request Body
-```json
+**Response (200):**
+```javascript
 {
-  "isVerified": true,
-  "verificationNotes": "All documents verified"
+  "success": true,
+  "salons": [
+    {
+      "_id": "...",
+      "name": "StyleHub Men's Salon",
+      "city": "Mumbai",
+      "address": "123 Main St, Andheri",
+      "phone": "+919876543210",
+      "email": "info@stylehub.com",
+      "logo": "https://...",
+      "isVerified": true,
+      "ownerName": "Owner Name",
+      "totalBookings": 1245,
+      "rating": 4.5,
+      "staffCount": 4,
+      "createdAt": "2025-06-15T10:30:00.000Z",
+      "disabled": false,
+      "deletedAt": null
+    }
+  ],
+  "totalPages": 17,
+  "total": 324,
+  "currentPage": 1
 }
 ```
 
-#### Business Logic
 
-1. Verify admin role
-2. Find salon by ID
-3. Update `isVerified` status
-4. Add verification notes
-5. Notify salon owner
-6. Return updated salon
+***
 
-#### Success Response
+#### **4.11.8 Get Salon Details**
 
-**Status Code:** `200 OK`
+**Endpoint:** `GET /api/admin/salons/:salonId`  
+**Access:** Private (Admin)  
+**Description:** Get detailed salon information [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-```json
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "salon": { /* full salon object */ },
+  "stats": {
+    "totalBookings": 1245,
+    "completedBookings": 1180,
+    "totalRevenue": 456789
+  }
+}
+```
+
+
+***
+
+#### **4.11.9 Get Salon Queue**
+
+**Endpoint:** `GET /api/admin/salons/:salonId/queue`  
+**Access:** Private (Admin)  
+**Description:** View current queue for salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "queue": [
+    {
+      "_id": "...",
+      "customerName": "John Doe",
+      "serviceName": "Haircut",
+      "status": "pending",
+      "createdAt": "2026-01-24T06:00:00.000Z"
+    }
+  ]
+}
+```
+
+
+***
+
+#### **4.11.10 Verify Salon**
+
+**Endpoint:** `PATCH /api/admin/salons/:salonId/verify`  
+**Access:** Private (Admin)  
+**Description:** Verify or unverify salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
+```javascript
+{
+  "verified": true,
+  "notes": "Documents verified, salon inspected"
+}
+```
+
+**Response (200):**
+```javascript
 {
   "success": true,
   "message": "Salon verified successfully",
   "data": {
-    "salon": {
-      "_id": "507f1f77bcf86cd799439012",
-      "name": "Elite Hair Studio",
-      "isVerified": true,
-      "verifiedAt": "2025-12-12T23:55:00.000Z",
-      "verificationNotes": "All documents verified"
-    }
+    "salonId": "...",
+    "isVerified": true
   }
 }
+```
+
+**Side Effects:**
+- Sets `isVerified` and `verificationMeta` fields
+- Logs action to AdminAuditLog [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.11.11 Disable Salon**
+
+**Endpoint:** `PATCH /api/admin/salons/:salonId/disable`  
+**Access:** Private (Admin)  
+**Description:** Disable salon (blocks new bookings) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
+```javascript
+{
+  "reason": "Multiple customer complaints"
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Salon disabled successfully",
+  "data": {
+    "salonId": "...",
+    "isActive": false,
+    "currentQueueSize": 0
+  }
+}
+```
+
+**Side Effects:**
+- Sets `isActive: false` and `isOpen: false`
+- Logs action to AdminAuditLog [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.11.12 Enable Salon**
+
+**Endpoint:** `PATCH /api/admin/salons/:salonId/enable`  
+**Access:** Private (Admin)  
+**Description:** Re-enable disabled salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.11.13 Get Bookings**
+
+**Endpoint:** `GET /api/admin/bookings`  
+**Access:** Private (Admin)  
+**Description:** Monitor all bookings across platform [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Query Parameters:**
+```
+page=1
+limit=20
+status=pending
+salonId=...
+startDate=2026-01-01
+endDate=2026-01-31
 ```
 
 ***
 
-## Complete Workflow Examples
+#### **4.11.14 Get Booking Details**
 
-### User Booking Flow (End-to-End)
-
-```
-1. User opens app
-   └─> GET /api/auth/refresh-token (if token exists)
-
-2. User grants location permission
-   └─> Device provides coordinates: 12.9716, 77.5946
-
-3. App fetches nearby salons
-   └─> GET /api/salons/nearby?latitude=12.9716&longitude=77.5946&radius=5&limit=10
-   └─> Displays list with distances and wait times
-
-4. User taps on a salon
-   └─> GET /api/salons/507f1f77bcf86cd799439012
-   └─> Shows full salon details, services, reviews, wait time
-
-5. User selects services and taps "Book Now"
-   └─> POST /api/bookings
-       Body: {
-         "salonId": "507f1f77bcf86cd799439012",
-         "services": ["507f1f77bcf86cd799439030"],
-         "scheduledTime": "2025-12-13T14:00:00.000Z"
-       }
-   └─> Returns booking with queue position: 3, wait time: 25 mins
-
-6. User waits and tracks booking
-   └─> Periodically: GET /api/bookings/507f1f77bcf86cd799439050
-   └─> Updates queue position in real-time
-
-7. Salon owner starts service
-   └─> PATCH /api/bookings/507f1f77bcf86cd799439050/start
-   └─> User receives push notification
-
-8. Service completed
-   └─> PATCH /api/bookings/507f1f77bcf86cd799439050/complete
-   └─> App prompts user to leave review
-
-9. User submits review
-   └─> POST /api/reviews
-       Body: {
-         "salonId": "507f1f77bcf86cd799439012",
-         "bookingId": "507f1f77bcf86cd799439050",
-         "rating": 5,
-         "comment": "Great service!"
-       }
-   └─> Review saved, salon rating updated
-```
+**Endpoint:** `GET /api/admin/bookings/:bookingId`  
+**Access:** Private (Admin)  
+**Description:** Get detailed booking information [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
 ***
 
-### Salon Owner Daily Flow
+#### **4.11.15 Get Audit Logs**
 
+**Endpoint:** `GET /api/admin/audit-logs`  
+**Access:** Private (Admin)  
+**Description:** View admin activity logs [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Query Parameters:**
 ```
-1. Owner logs in
-   └─> POST /api/auth/login
-       Body: { "identifier": "owner@salon.com", "password": "***" }
-   └─> Receives JWT token
-
-2. Owner views today's queue
-   └─> GET /api/bookings/salon/507f1f77bcf86cd799439012/queue
-   └─> Displays 5 pending bookings
-
-3. Owner starts first booking
-   └─> PATCH /api/bookings/<bookingId>/start
-   └─> Customer receives notification
-
-4. Owner completes booking
-   └─> PATCH /api/bookings/<bookingId>/complete
-   └─> Moves to next in queue
-
-5. Owner checks analytics (end of day)
-   └─> GET /api/analytics/salon/507f1f77bcf86cd799439012?startDate=2025-12-12&endDate=2025-12-12
-   └─> Views: 15 bookings today, ₹10,500 revenue, 4.6 avg rating
-
-6. Owner updates opening hours
-   └─> PUT /api/salons/507f1f77bcf86cd799439012
-       Body: { "openingHours": { "monday": { "open": "10:00", "close": "22:00" } } }
+page=1
+limit=50
+adminId=...            # Filter by admin who performed action
+actionType=user_soft_delete
+entityType=user        # user|salon|booking|system
+startDate=2026-01-01
+endDate=2026-01-31
 ```
 
-***
-
-## Rate Limiting & Security
-
-### Rate Limiting Strategy
-
-| Endpoint Category | Rate Limit | Window | Scope |
-|-------------------|------------|--------|-------|
-| Authentication | 5 requests | 15 min | Per IP |
-| OTP Requests | 3 requests | 1 hour | Per phone |
-| Public APIs (salons, reviews) | 100 requests | 15 min | Per IP |
-| Authenticated APIs | 200 requests | 15 min | Per user |
-| Admin APIs | 500 requests | 15 min | Per user |
-| File Uploads | 10 uploads | 1 hour | Per user |
-
-### Implementation
-- Use `express-rate-limit` middleware
-- Store rate limit counters in Redis
-- Return `429 Too Many Requests` with `Retry-After` header
-- Implement exponential backoff on client side
-
-### Security Best Practices
-
-**Token Security:**
-- JWT tokens expire after 30 days
-- Use HTTPS only in production
-- Implement token blacklist for logout (Redis)
-- Rotate JWT secret periodically
-
-**Password Security:**
-- Bcrypt with 10 salt rounds
-- Minimum 8 characters, complexity requirements
-- Implement account lockout after 5 failed attempts
-- Force password reset after 90 days (optional)
-
-**Input Validation:**
-- Sanitize all user inputs
-- Use Mongoose schema validation
-- Implement request payload size limits (10MB)
-- Validate ObjectId formats before querying
-
-**API Security:**
-- CORS configuration (whitelist frontend domains)
-- Helmet.js for HTTP headers
-- Input sanitization against NoSQL injection
-- SQL/NoSQL injection prevention via parameterized queries
-
-**File Upload Security:**
-- Validate MIME types (not just extensions)
-- Limit file sizes (5MB for images)
-- Scan uploads for malware (ClamAV integration)
-- Use signed URLs for Cloudinary uploads
-
-***
-
-## Frontend Integration Guide
-
-### Authentication Flow
-
-```dart
-// 1. Store token securely
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-final storage = FlutterSecureStorage();
-
-Future<void> saveToken(String token) async {
-  await storage.write(key: 'jwt_token', value: token);
-}
-
-Future<String?> getToken() async {
-  return await storage.read(key: 'jwt_token');
-}
-
-// 2. Add token to all API requests
-import 'package:http/http.dart' as http;
-
-Future<http.Response> authenticatedRequest(String url) async {
-  final token = await getToken();
-  return http.get(
-    Uri.parse(url),
-    headers: {
-      'Authorization': 'Bearer $token',
-      'Content-Type': 'application/json',
-    },
-  );
-}
-
-// 3. Handle token expiration
-if (response.statusCode == 401) {
-  // Token expired, refresh or re-login
-  await refreshToken();
-  // Retry original request
-}
-```
-
-### Error Handling
-
-```dart
-class ApiException implements Exception {
-  final String code;
-  final String message;
-  final List<String>? details;
-
-  ApiException(this.code, this.message, [this.details]);
-
-  factory ApiException.fromJson(Map<String, dynamic> json) {
-    return ApiException(
-      json['error']['code'],
-      json['error']['message'],
-      json['error']['details']?.cast<String>(),
-    );
-  }
-}
-
-// Usage
-try {
-  final response = await http.get(url);
-  if (response.statusCode != 200) {
-    final error = ApiException.fromJson(jsonDecode(response.body));
-    throw error;
-  }
-} on ApiException catch (e) {
-  // Show user-friendly error message
-  showErrorDialog(e.message);
-}
-```
-
-### Caching Strategy
-
-```dart
-// Use shared_preferences for simple caching
-import 'package:shared_preferences/shared_preferences.dart';
-
-class ApiCache {
-  static Future<void> cacheSalonList(List<dynamic> salons) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('cached_salons', jsonEncode(salons));
-    await prefs.setInt('cache_timestamp', DateTime.now().millisecondsSinceEpoch);
-  }
-
-  static Future<List<dynamic>?> getCachedSalons({int maxAgeMinutes = 10}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final timestamp = prefs.getInt('cache_timestamp') ?? 0;
-    final age = DateTime.now().millisecondsSinceEpoch - timestamp;
-    
-    if (age < maxAgeMinutes * 60 * 1000) {
-      final cached = prefs.getString('cached_salons');
-      return cached != null ? jsonDecode(cached) : null;
-    }
-    return null;
-  }
-}
-```
-
-### Real-Time Updates (Polling)
-
-```dart
-import 'dart:async';
-
-class BookingTracker {
-  Timer? _timer;
-
-  void startTracking(String bookingId, Function(Map<String, dynamic>) onUpdate) {
-    _timer = Timer.periodic(Duration(seconds: 30), (timer) async {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/bookings/$bookingId'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        onUpdate(data['data']['booking']);
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "data": {
+    "logs": [
+      {
+        "_id": "...",
+        "adminId": { "name": "Admin User", "email": "admin@lynin.com" },
+        "adminName": "Admin User",
+        "adminEmail": "admin@lynin.com",
+        "actionType": "user_soft_delete",
+        "entityType": "user",
+        "entityId": "...",
+        "previousState": { "isActive": true },
+        "newState": { "isActive": false },
+        "reason": "Violating terms of service",
+        "ipAddress": "103.45.67.89",
+        "userAgent": "Mozilla/5.0...",
+        "timestamp": "2026-01-24T06:00:00.000Z"
       }
-    });
+    ],
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 45,
+      "totalLogs": 2234,
+      "limit": 50
+    }
   }
-
-  void stopTracking() {
-    _timer?.cancel();
-  }
-}
-
-// Usage
-final tracker = BookingTracker();
-tracker.startTracking(bookingId, (booking) {
-  setState(() {
-    queuePosition = booking['queuePosition'];
-    estimatedStartTime = booking['estimatedStartTime'];
-  });
-});
-```
-
-### Image Upload
-
-```dart
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-
-Future<String?> uploadProfileImage(File imageFile) async {
-  final token = await getToken();
-  final request = http.MultipartRequest(
-    'POST',
-    Uri.parse('$baseUrl/api/users/profile/upload-image'),
-  );
-  
-  request.headers['Authorization'] = 'Bearer $token';
-  request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-  
-  final response = await request.send();
-  
-  if (response.statusCode == 200) {
-    final responseBody = await response.stream.bytesToString();
-    final data = jsonDecode(responseBody);
-    return data['data']['imageUrl'];
-  }
-  
-  return null;
 }
 ```
 
-### Common Mistakes to Avoid
-
-1. **Storing Passwords Locally:**
-   ```dart
-   // ❌ NEVER DO THIS
-   SharedPreferences.setString('user_password', password);
-   
-   // ✅ CORRECT: Only store JWT token securely
-   FlutterSecureStorage().write(key: 'jwt_token', value: token);
-   ```
-
-2. **Exposing Sensitive Data in Logs:**
-   ```dart
-   // ❌ NEVER DO THIS
-   print('User token: $jwtToken');
-   print('API Response: ${response.body}');
-   
-   // ✅ CORRECT: Log without sensitive data
-   debugPrint('API call successful');
-   // Use production-safe logging
-   if (kDebugMode) {
-     print('Token received');
-   }
-   ```
-
-3. **Not Handling Network Errors:**
-   ```dart
-   // ❌ BAD: Assumes network always works
-   final response = await http.get(url);
-   final data = jsonDecode(response.body);
-   
-   // ✅ CORRECT: Handle all error cases
-   try {
-     final response = await http.get(url).timeout(Duration(seconds: 10));
-     if (response.statusCode == 200) {
-       final data = jsonDecode(response.body);
-       return data;
-     } else {
-       throw ApiException.fromJson(jsonDecode(response.body));
-     }
-   } on TimeoutException {
-     throw NetworkException('Request timeout');
-   } on SocketException {
-     throw NetworkException('No internet connection');
-   } catch (e) {
-     throw UnknownException(e.toString());
-   }
-   ```
-
-4. **Sending Unvalidated User Input:**
-   ```dart
-   // ❌ BAD: Sends raw user input
-   final body = jsonEncode({'comment': userComment});
-   
-   // ✅ CORRECT: Validate and sanitize
-   final sanitizedComment = userComment.trim();
-   if (sanitizedComment.length > 1000) {
-     throw ValidationException('Comment too long');
-   }
-   final body = jsonEncode({'comment': sanitizedComment});
-   ```
-
-5. **Not Implementing Retry Logic:**
-   ```dart
-   // ✅ IMPLEMENT: Exponential backoff retry
-   Future<http.Response> retryableRequest(String url, {int maxRetries = 3}) async {
-     int retries = 0;
-     while (retries < maxRetries) {
-       try {
-         final response = await http.get(Uri.parse(url));
-         if (response.statusCode == 200) return response;
-         if (response.statusCode >= 500) {
-           retries++;
-           await Future.delayed(Duration(seconds: pow(2, retries).toInt()));
-           continue;
-         }
-         throw ApiException.fromJson(jsonDecode(response.body));
-       } catch (e) {
-         if (retries == maxRetries - 1) rethrow;
-         retries++;
-         await Future.delayed(Duration(seconds: pow(2, retries).toInt()));
-       }
-     }
-     throw Exception('Max retries exceeded');
-   }
-   ```
-
-6. **Fetching Data on Every Widget Build:**
-   ```dart
-   // ❌ BAD: Fetches on every rebuild
-   @override
-   Widget build(BuildContext context) {
-     fetchSalons(); // Called multiple times!
-     return ListView(...);
-   }
-   
-   // ✅ CORRECT: Fetch once in initState
-   @override
-   void initState() {
-     super.initState();
-     _fetchSalonsOnce();
-   }
-   
-   Future<void> _fetchSalonsOnce() async {
-     if (_salons == null) {
-       final salons = await fetchSalons();
-       setState(() => _salons = salons);
-     }
-   }
-   ```
-
-7. **Not Implementing Pull-to-Refresh:**
-   ```dart
-   // ✅ IMPLEMENT: RefreshIndicator for lists
-   RefreshIndicator(
-     onRefresh: () async {
-       await fetchSalons(forceRefresh: true);
-     },
-     child: ListView.builder(...),
-   )
-   ```
-
-8. **Ignoring Pagination:**
-   ```dart
-   // ✅ IMPLEMENT: Infinite scroll pagination
-   class SalonListScreen extends StatefulWidget {
-     @override
-     _SalonListScreenState createState() => _SalonListScreenState();
-   }
-   
-   class _SalonListScreenState extends State<SalonListScreen> {
-     final ScrollController _scrollController = ScrollController();
-     List<Salon> _salons = [];
-     int _currentPage = 1;
-     bool _hasMore = true;
-     bool _isLoading = false;
-   
-     @override
-     void initState() {
-       super.initState();
-       _fetchSalons();
-       _scrollController.addListener(_scrollListener);
-     }
-   
-     void _scrollListener() {
-       if (_scrollController.position.pixels == 
-           _scrollController.position.maxScrollExtent) {
-         _fetchSalons();
-       }
-     }
-   
-     Future<void> _fetchSalons() async {
-       if (_isLoading || !_hasMore) return;
-       
-       setState(() => _isLoading = true);
-       
-       final response = await http.get(
-         Uri.parse('$baseUrl/api/salons/nearby?page=$_currentPage&limit=10'),
-       );
-       
-       if (response.statusCode == 200) {
-         final data = jsonDecode(response.body);
-         final newSalons = (data['data']['salons'] as List)
-             .map((json) => Salon.fromJson(json))
-             .toList();
-         
-         setState(() {
-           _salons.addAll(newSalons);
-           _currentPage++;
-           _hasMore = data['pagination']['hasNextPage'];
-           _isLoading = false;
-         });
-       }
-     }
-   
-     @override
-     Widget build(BuildContext context) {
-       return ListView.builder(
-         controller: _scrollController,
-         itemCount: _salons.length + (_hasMore ? 1 : 0),
-         itemBuilder: (context, index) {
-           if (index == _salons.length) {
-             return Center(child: CircularProgressIndicator());
-           }
-           return SalonCard(salon: _salons[index]);
-         },
-       );
-     }
-   }
-   ```
 
 ***
 
-## API Versioning Strategy
+### **4.12 FAQ APIS**
 
-### Current Implementation
-- **Version:** v1 (implicit)
-- **Base URL:** `/api/*`
-- All endpoints currently under `/api/` prefix
+#### **4.12.1 Get All FAQs**
 
-### Future Versioning Plan
+**Endpoint:** `GET /api/faqs`  
+**Access:** Public  
+**Description:** Get cached FAQs grouped by category [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
-**URL-Based Versioning (Recommended):**
+**Query Parameters:**
 ```
-/api/v1/salons/nearby
-/api/v2/salons/nearby
-```
-
-**Header-Based Versioning (Alternative):**
-```http
-GET /api/salons/nearby
-Accept-Version: v1
+category=bookings      # Optional filter
+search=cancel          # Optional text search
 ```
 
-### Version Migration Guidelines
-
-1. **Backward Compatibility Window:**
-   - Support previous version for minimum 6 months
-   - Deprecated endpoints return `Deprecation` header
-   - Example:
-     ```http
-     Deprecation: true
-     Sunset: Sat, 13 Jun 2026 00:00:00 GMT
-     Link: </api/v2/salons/nearby>; rel="successor-version"
-     ```
-
-2. **Breaking Changes Requiring New Version:**
-   - Removing fields from response
-   - Changing field data types
-   - Modifying authentication mechanism
-   - Changing URL structure
-
-3. **Non-Breaking Changes (Same Version):**
-   - Adding optional request parameters
-   - Adding new fields to response
-   - Adding new endpoints
-   - Performance improvements
-
-4. **Version Deprecation Process:**
-   ```
-   Month 1-3: Announce deprecation, add warning headers
-   Month 4-6: Send email notifications to active API users
-   Month 6: Disable old version, redirect to new version
-   ```
-
-***
-
-## Database Schema Reference
-
-### User Model
-
+**Response (200):**
 ```javascript
-const userSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 2,
-    maxlength: 50
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
-  },
-  phone: {
-    type: String,
-    required: true,
-    unique: true,
-    match: /^\+[1-9]\d{1,14}$/ // E.164 format
-  },
-  password: {
-    type: String,
-    required: true,
-    minlength: 8,
-    select: false // Never return in queries by default
-  },
-  role: {
-    type: String,
-    enum: ['user', 'owner', 'admin'],
-    default: 'user'
-  },
-  profileImage: {
-    type: String,
-    default: null
-  },
-  isVerified: {
-    type: Boolean,
-    default: false
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  favorites: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Salon'
-  }],
-  lastLogin: {
-    type: Date,
-    default: null
-  },
-  failedLoginAttempts: {
-    type: Number,
-    default: 0
-  },
-  lockUntil: {
-    type: Date,
-    default: null
-  }
-}, {
-  timestamps: true
-});
-
-// Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ phone: 1 });
-userSchema.index({ role: 1 });
-```
-
-### Salon Model
-
-```javascript
-const salonSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 3,
-    maxlength: 100
-  },
-  description: {
-    type: String,
-    required: true,
-    minlength: 20,
-    maxlength: 500
-  },
-  owner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  location: {
-    type: {
-      type: String,
-      enum: ['Point'],
-      required: true,
-      default: 'Point'
-    },
-    coordinates: {
-      type: [Number], // [longitude, latitude]
-      required: true,
-      validate: {
-        validator: function(v) {
-          return v.length === 2 && 
-                 v[0] >= -180 && v[0] <= 180 && // longitude
-                 v[1] >= -90 && v[1] <= 90;     // latitude
-        },
-        message: 'Invalid coordinates'
+{
+  "success": true,
+  "cached": true,  // true if served from cache
+  "faqs": {
+    "general": [
+      {
+        "_id": "...",
+        "question": "What is Lynin?",
+        "answer": "Lynin is a salon booking platform...",
+        "category": "general",
+        "order": 1,
+        "tags": ["platform", "intro"],
+        "views": 1245,
+        "helpful": 890,
+        "notHelpful": 12
       }
-    },
-    address: {
-      type: String,
-      required: true
-    },
-    city: {
-      type: String,
-      required: true,
-      index: true
-    },
-    state: {
-      type: String,
-      required: true
-    },
-    pincode: {
-      type: String,
-      required: true
-    },
-    landmark: String
-  },
-  contactNumber: {
-    type: String,
-    required: true,
-    match: /^\+[1-9]\d{1,14}$/
-  },
-  email: {
-    type: String,
-    lowercase: true,
-    match: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
-  },
-  website: String,
-  images: [{
-    type: String
-  }],
-  services: [{
-    name: {
-      type: String,
-      required: true
-    },
-    description: String,
-    price: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    duration: {
-      type: Number, // in minutes
-      required: true,
-      min: 1
-    },
-    category: {
-      type: String,
-      enum: ['Haircut', 'Coloring', 'Styling', 'Treatment', 'Spa', 'Makeup', 'Other']
-    },
-    isActive: {
-      type: Boolean,
-      default: true
-    }
-  }],
-  openingHours: {
-    monday: { open: String, close: String, closed: Boolean },
-    tuesday: { open: String, close: String, closed: Boolean },
-    wednesday: { open: String, close: String, closed: Boolean },
-    thursday: { open: String, close: String, closed: Boolean },
-    friday: { open: String, close: String, closed: Boolean },
-    saturday: { open: String, close: String, closed: Boolean },
-    sunday: { open: String, close: String, closed: Boolean }
-  },
-  amenities: [{
-    type: String,
-    enum: ['WiFi', 'AC', 'Parking', 'Card Payment', 'Wheelchair Accessible', 'Kids Friendly']
-  }],
-  rating: {
-    average: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 5
-    },
-    count: {
-      type: Number,
-      default: 0
-    },
-    breakdown: {
-      5: { type: Number, default: 0 },
-      4: { type: Number, default: 0 },
-      3: { type: Number, default: 0 },
-      2: { type: Number, default: 0 },
-      1: { type: Number, default: 0 }
-    }
-  },
-  isVerified: {
-    type: Boolean,
-    default: false
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  isDeleted: {
-    type: Boolean,
-    default: false
-  },
-  totalBookings: {
-    type: Number,
-    default: 0
-  },
-  favoriteCount: {
-    type: Number,
-    default: 0
+    ],
+    "bookings": [ /* ... */ ],
+    "payments": [ /* ... */ ]
   }
-}, {
-  timestamps: true
-});
-
-// Geospatial Index (CRITICAL for location queries)
-salonSchema.index({ 'location.coordinates': '2dsphere' });
-
-// Other Indexes
-salonSchema.index({ owner: 1 });
-salonSchema.index({ city: 1, 'rating.average': -1 });
-salonSchema.index({ name: 'text', description: 'text' });
-salonSchema.index({ isActive: 1, isDeleted: 1 });
-
-// Virtual for checking if salon is currently open
-salonSchema.virtual('isOpen').get(function() {
-  const now = new Date();
-  const day = now.toLocaleDateString('en-US', { weekday: 'lowercase' });
-  const currentTime = now.toTimeString().slice(0, 5); // HH:MM
-  
-  const hours = this.openingHours[day];
-  if (!hours || hours.closed) return false;
-  
-  return currentTime >= hours.open && currentTime <= hours.close;
-});
+}
 ```
 
-### Booking Model
+**Caching:**
+- Results cached for 24 hours
+- Cache cleared when FAQs updated via admin [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
 
+***
+
+#### **4.12.2 Increment FAQ View Count**
+
+**Endpoint:** `POST /api/faqs/:id/view`  
+**Access:** Public  
+**Description:** Track FAQ view analytics [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.12.3 Submit FAQ Feedback**
+
+**Endpoint:** `POST /api/faqs/:id/feedback`  
+**Access:** Public  
+**Description:** Mark FAQ as helpful or not helpful [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
 ```javascript
-const bookingSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true
-  },
-  salon: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Salon',
-    required: true,
-    index: true
-  },
-  services: [{
-    serviceId: mongoose.Schema.Types.ObjectId,
-    name: String,
-    price: Number,
-    duration: Number
-  }],
-  totalPrice: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  totalDuration: {
-    type: Number, // in minutes
-    required: true,
-    min: 1
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'in-progress', 'completed', 'cancelled', 'no-show'],
-    default: 'pending',
-    index: true
-  },
-  queuePosition: {
-    type: Number,
-    default: 0
-  },
-  scheduledTime: {
-    type: Date,
-    required: true
-  },
-  estimatedStartTime: {
-    type: Date
-  },
-  actualStartTime: {
-    type: Date
-  },
-  completionTime: {
-    type: Date
-  },
-  notes: {
-    type: String,
-    maxlength: 500
-  },
-  cancellationReason: {
-    type: String,
-    maxlength: 500
-  },
-  cancelledBy: {
-    type: String,
-    enum: ['user', 'salon', 'admin']
-  },
-  cancelledAt: {
-    type: Date
-  },
-  review: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Review'
-  },
-  statusHistory: [{
-    status: String,
-    timestamp: { type: Date, default: Date.now },
-    note: String
-  }]
-}, {
-  timestamps: true
-});
-
-// Compound Indexes
-bookingSchema.index({ salon: 1, status: 1, queuePosition: 1 });
-bookingSchema.index({ user: 1, status: 1, createdAt: -1 });
-bookingSchema.index({ scheduledTime: 1, status: 1 });
-
-// Virtual for checking if booking is active
-bookingSchema.virtual('isActive').get(function() {
-  return ['pending', 'in-progress'].includes(this.status);
-});
-```
-
-### Review Model
-
-```javascript
-const reviewSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true
-  },
-  salon: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Salon',
-    required: true,
-    index: true
-  },
-  booking: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking'
-  },
-  rating: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 5
-  },
-  comment: {
-    type: String,
-    maxlength: 1000
-  },
-  categories: {
-    ambiance: { type: Number, min: 1, max: 5 },
-    service: { type: Number, min: 1, max: 5 },
-    value: { type: Number, min: 1, max: 5 }
-  },
-  images: [{
-    type: String
-  }],
-  isVerified: {
-    type: Boolean,
-    default: false // true if linked to completed booking
-  },
-  helpful: {
-    type: Number,
-    default: 0
-  },
-  helpfulBy: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  isEdited: {
-    type: Boolean,
-    default: false
-  },
-  isDeleted: {
-    type: Boolean,
-    default: false
-  },
-  response: {
-    text: String,
-    respondedAt: Date,
-    respondedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }
-  }
-}, {
-  timestamps: true
-});
-
-// Compound Indexes
-reviewSchema.index({ salon: 1, rating: 1 });
-reviewSchema.index({ user: 1, salon: 1 }, { unique: true });
-reviewSchema.index({ createdAt: -1 });
-
-// Prevent multiple reviews per user per salon
-reviewSchema.index({ user: 1, salon: 1 }, { 
-  unique: true,
-  partialFilterExpression: { isDeleted: false }
-});
-```
-
-### OTP Model
-
-```javascript
-const otpSchema = new mongoose.Schema({
-  phone: {
-    type: String,
-    required: true,
-    index: true
-  },
-  otp: {
-    type: String,
-    required: true
-  },
-  purpose: {
-    type: String,
-    enum: ['registration', 'login', 'reset_password'],
-    required: true
-  },
-  expiresAt: {
-    type: Date,
-    required: true,
-    index: true
-  },
-  verified: {
-    type: Boolean,
-    default: false
-  },
-  attempts: {
-    type: Number,
-    default: 0
-  }
-}, {
-  timestamps: true
-});
-
-// TTL Index - auto-delete after expiration
-otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-// Compound index for queries
-otpSchema.index({ phone: 1, purpose: 1, verified: 1 });
+{
+  "helpful": true  // or false
+}
 ```
 
 ***
 
-## Environment Variables Reference
+#### **4.12.4 Create FAQ (Admin)**
 
-### Required Environment Variables
+**Endpoint:** `POST /api/faqs`  
+**Access:** Private (Admin)  
+**Description:** Add new FAQ [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
+```javascript
+{
+  "question": "How do I cancel a booking?",
+  "answer": "Go to My Bookings and tap Cancel...",
+  "category": "bookings",
+  "order": 5,
+  "tags": ["cancel", "bookings"]
+}
+```
+
+***
+
+#### **4.12.5 Update FAQ (Admin)**
+
+**Endpoint:** `PUT /api/faqs/:id`  
+**Access:** Private (Admin)  
+**Description:** Edit existing FAQ [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.12.6 Delete FAQ (Admin)**
+
+**Endpoint:** `DELETE /api/faqs/:id`  
+**Access:** Private (Admin)  
+**Description:** Remove FAQ [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+### **4.13 FEATURE FLAGS & APP INFO APIS**
+
+#### **4.13.1 Get Feature Flags**
+
+**Endpoint:** `GET /api/feature-flags`  
+**Access:** Public  
+**Description:** Get live chat configuration [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "cached": true,
+  "featureFlags": {
+    "isLiveChatEnabled": true,
+    "tawkToScript": "https://embed.tawk.to/..."
+  }
+}
+```
+
+**Caching:** 24-hour cache [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.13.2 Update Feature Flags (Admin)**
+
+**Endpoint:** `PUT /api/feature-flags`  
+**Access:** Private (Admin)  
+**Description:** Enable/disable live chat [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Request:**
+```javascript
+{
+  "isLiveChatEnabled": true,
+  "tawkToScript": "https://embed.tawk.to/..."
+}
+```
+
+***
+
+#### **4.13.3 Get App Info**
+
+**Endpoint:** `GET /api/app-info`  
+**Access:** Public  
+**Description:** Get app metadata (privacy policy URLs, social media, licenses) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "cached": true,
+  "appInfo": {
+    "_id": "...",
+    "appName": "Lynin",
+    "appDescription": "Smart salon booking platform",
+    "appLogo": "https://...",
+    "companyName": "Lynin Technologies",
+    "yearOfLaunch": 2025,
+    "websiteUrl": "https://lynin.com",
+    "privacyPolicyUrl": "https://lynin.com/privacy",
+    "termsAndConditionsUrl": "https://lynin.com/terms",
+    "refundPolicyUrl": "https://lynin.com/refund",
+    "supportEmail": "support@lynin.com",
+    "supportPhone": "+919876543210",
+    "socialMedia": {
+      "facebook": "https://facebook.com/lynin",
+      "instagram": "https://instagram.com/lynin",
+      "twitter": "https://twitter.com/lynin",
+      "linkedin": "https://linkedin.com/company/lynin",
+      "youtube": "https://youtube.com/lynin"
+    },
+    "openSourceLicenses": [
+      {
+        "name": "Express.js",
+        "license": "MIT",
+        "url": "https://github.com/expressjs/express",
+        "version": "4.18.2"
+      }
+    ],
+    "isActive": true
+  }
+}
+```
+
+**Caching:** 24-hour cache [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **4.13.4 Update App Info (Admin)**
+
+**Endpoint:** `PUT /api/app-info`  
+**Access:** Private (Admin)  
+**Description:** Update app metadata [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+### **4.14 QUEUE MANAGEMENT APIS**
+
+#### **4.14.1 Get Queue by Salon**
+
+**Endpoint:** `GET /api/queue/:salonId`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Get live queue sorted by position [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "count": 5,
+  "queue": [
+    {
+      "_id": "...",
+      "customerName": "John Doe",          // or "Token #0001"
+      "customerPhone": "+919876543210",    // or "N/A"
+      "walkInToken": null,                 // or "0001"
+      "services": [ { "name": "Haircut", "price": 300, "duration": 30 } ],
+      "totalPrice": 300,
+      "totalDuration": 30,
+      "queuePosition": 1,
+      "status": "pending",
+      "arrived": true,
+      "arrivedAt": "2026-01-24T06:00:00.000Z",
+      "joinedAt": "2026-01-24T06:00:00.000Z",
+      "estimatedStartTime": "2026-01-24T06:05:00.000Z"
+    }
+  ]
+}
+```
+
+
+***
+
+#### **4.14.2 Add Walk-In to Queue**
+
+**Endpoint:** `POST /api/queue/:salonId/walk-in`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Add walk-in customer to queue [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Request:**
+```javascript
+{
+  "name": "Walk-in Customer",  // Optional
+  "phone": "+919876543210",    // Optional
+  "services": [
+    {
+      "name": "Haircut",
+      "price": 300,
+      "duration": 30
+    }
+  ]
+}
+```
+
+**Response (201):**
+```javascript
+{
+  "success": true,
+  "message": "Walk-in customer added with account created/linked",  // or "Walk-in added with token #0001"
+  "booking": {
+    "_id": "...",
+    "userId": "...",                // null if anonymous
+    "customerName": "Walk-in Customer",  // or "Token #0001"
+    "customerPhone": "+919876543210",    // or "N/A"
+    "walkInToken": null,            // or "0001"
+    "services": [ /* ... */ ],
+    "totalPrice": 300,
+    "totalDuration": 30,
+    "queuePosition": 6,
+    "status": "pending",
+    "arrived": true,
+    "arrivedAt": "2026-01-24T06:10:00.000Z",
+    "bookingType": "immediate"
+  }
+}
+```
+
+**Logic:**
+1. **If phone provided:** Creates/links user account
+2. **If no phone/name:** Generates 4-digit token (0001, 0002, etc.) resets daily
+3. Automatically marks as `arrived: true`
+4. Assigns queue position at end of queue [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+***
+
+#### **4.14.3 Start Service**
+
+**Endpoint:** `POST /api/queue/:salonId/start/:bookingId`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Mark service as started (status: in-progress) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Service started",
+  "booking": {
+    "_id": "...",
+    "status": "in-progress",
+    "startedAt": "2026-01-24T06:15:00.000Z"
+  }
+}
+```
+
+**Side Effects:**
+- Sends FCM notification to customer
+- Emits Socket.IO event `service_started` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+***
+
+#### **4.14.4 Start Priority Service**
+
+**Endpoint:** `POST /api/queue/:salonId/start-priority/:bookingId`  
+**Access:** Private (Owner/Manager only)  
+**Description:** Start service as priority (skip queue) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Request:**
+```javascript
+{
+  "reason": "Senior citizen"  // Required
+  // Options: "Senior citizen", "Medical urgency", "Child", "System exception"
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Priority service started",
+  "booking": {
+    "_id": "...",
+    "status": "in-progress",
+    "startedAt": "2026-01-24T06:15:00.000Z",
+    "queuePosition": 1,  // Moved to front
+    "originalPosition": 5
+  }
+}
+```
+
+
+**Side Effects:**
+- Logs to PriorityLog collection
+- Moves booking to front of queue
+- Sends FCM notification to customer with priority alert
+- Emits Socket.IO event `priority_started`
+- Reorders all other queue positions [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Daily Limit:** Maximum 5 priority insertions per day per salon (configurable via `salon.priorityLimitPerDay`)
+
+***
+
+#### **4.14.5 Complete Service**
+
+**Endpoint:** `POST /api/queue/:salonId/complete/:bookingId`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Mark service as completed, auto-mark payment as paid [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Service completed and payment recorded",
+  "booking": {
+    "_id": "...",
+    "status": "completed",
+    "completedAt": "2026-01-24T06:45:00.000Z",
+    "paymentStatus": "paid",
+    "paidAmount": 450
+  },
+  "pointsEarned": 45  // 1 point per ₹10
+}
+```
+
+**Side Effects:**
+- Sets `status: 'completed'`, `completedAt`
+- **Auto-marks payment:** `paymentStatus: 'paid'`, `paidAmount: totalPrice`, `paymentDate: now`
+- Awards loyalty points (1 point per ₹10 spent) - only if `userId` exists
+- Increments `user.totalBookings` and `user.loyaltyPoints`
+- Removes from queue, reorders remaining bookings
+- Sends FCM notification to customer (request review)
+- Emits Socket.IO event `service_completed`
+- Updates wait times for all clients [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+***
+
+#### **4.14.6 Skip Booking**
+
+**Endpoint:** `POST /api/queue/:salonId/skip/:bookingId`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Skip customer (move to back of queue) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Request:**
+```javascript
+{
+  "reason": "Customer not ready"  // Optional
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Booking skipped",
+  "booking": {
+    "_id": "...",
+    "status": "skipped",
+    "queuePosition": 5,  // Moved to end
+    "originalPosition": 1,
+    "skippedAt": "2026-01-24T06:30:00.000Z",
+    "skipReason": "Customer not ready"
+  }
+}
+```
+
+**Side Effects:**
+- Sets `status: 'skipped'`, `skippedAt`, `originalPosition`
+- Moves to end of queue
+- Reorders remaining bookings
+- Emits Socket.IO event `queue_updated` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+***
+
+#### **4.14.7 Restore Skipped Booking**
+
+**Endpoint:** `POST /api/queue/:salonId/restore-skipped/:bookingId`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Restore skipped booking to original position or end of queue [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Booking restored",
+  "booking": {
+    "_id": "...",
+    "status": "pending",
+    "queuePosition": 1  // Restored to original or end
+  }
+}
+```
+
+
+***
+
+#### **4.14.8 Mark Customer Arrived**
+
+**Endpoint:** `POST /api/queue/:salonId/arrived`  
+**Access:** Private (Owner/Manager/Staff)  
+**Description:** Mark scheduled booking customer as arrived [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+**Request:**
+```javascript
+{
+  "bookingId": "...",           // Option 1: Direct booking ID
+  "phoneLastFour": "3210"       // Option 2: Search by last 4 digits of phone
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Customer marked as arrived",
+  "booking": {
+    "_id": "...",
+    "queuePosition": 4,
+    "arrived": true,
+    "arrivedAt": "2026-01-24T14:25:00.000Z"
+  }
+}
+```
+
+**Side Effects:**
+- Sets `arrived: true`, `arrivedAt`
+- Emits Socket.IO event `customer_arrived` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+***
+
+### **4.15 SALON SETUP WIZARD APIS**
+
+The setup wizard guides new salon owners through 4 steps: Profile → Hours → Services → Capacity [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+#### **4.15.1 Get Setup Status**
+
+**Endpoint:** `GET /api/salon-setup/status`  
+**Access:** Private (Owner)  
+**Description:** Check current setup progress [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "setupCompleted": false,
+  "currentStep": "profile",  // profile|hours|services|capacity|completed
+  "salon": null              // or salon object if exists
+}
+```
+
+
+***
+
+#### **4.15.2 Save Profile Setup (Step 1)**
+
+**Endpoint:** `POST /api/salon-setup/profile`  
+**Access:** Private (Owner)  
+**Description:** Create salon profile with location [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Request:**
+```javascript
+{
+  "name": "StyleHub Men's Salon",
+  "address": "123 Main St, Andheri West",
+  "city": "Mumbai",
+  "state": "Maharashtra",
+  "pincode": "400058",
+  "phone": "+919876543210",
+  "email": "info@stylehub.com",
+  "description": "Premium men's grooming",
+  "longitude": 72.8777,  // Required
+  "latitude": 19.0760,   // Required
+  "images": ["https://...", "https://..."]
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Profile setup saved",
+  "nextStep": "hours",
+  "salon": {
+    "_id": "...",
+    "name": "StyleHub Men's Salon",
+    "address": "123 Main St, Andheri West",
+    "images": ["https://..."]
+  }
+}
+```
+
+**Side Effects:**
+- Creates salon with `ownerId: req.user._id`
+- Links salon to user: `user.salonId = salon._id`
+- Updates `user.setupStep = 'hours'`
+- Sets `salon.isActive: false`, `salon.isVerified: false` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+***
+
+#### **4.15.3 Save Hours Setup (Step 2)**
+
+**Endpoint:** `POST /api/salon-setup/hours`  
+**Access:** Private (Owner)  
+**Description:** Configure operating hours [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Request:**
+```javascript
+{
+  "hours": {
+    "monday": { "open": "09:00", "close": "21:00", "closed": false },
+    "tuesday": { "open": "09:00", "close": "21:00", "closed": false },
+    "wednesday": { "open": "09:00", "close": "21:00", "closed": false },
+    "thursday": { "open": "09:00", "close": "21:00", "closed": false },
+    "friday": { "open": "09:00", "close": "21:00", "closed": false },
+    "saturday": { "open": "09:00", "close": "21:00", "closed": false },
+    "sunday": { "open": "10:00", "close": "18:00", "closed": false }
+  }
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Operating hours saved",
+  "nextStep": "services"
+}
+```
+
+**Side Effects:**
+- Updates `salon.hours`
+- Updates `user.setupStep = 'services'` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+***
+
+#### **4.15.4 Save Services Setup (Step 3)**
+
+**Endpoint:** `POST /api/salon-setup/services`  
+**Access:** Private (Owner)  
+**Description:** Add services with categories [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Request:**
+```javascript
+{
+  "services": [
+    {
+      "name": "Classic Haircut",
+      "price": 300,
+      "duration": 30,
+      "description": "Traditional men's haircut",
+      "category": "Hair",        // Hair|Beard|Body|Add-on (required)
+      "isPrimary": true,         // Show prominently
+      "isUpsell": false          // Suggest during checkout
+    },
+    {
+      "name": "Beard Trim",
+      "price": 150,
+      "duration": 15,
+      "description": "Beard shaping and trimming",
+      "category": "Beard",
+      "isPrimary": true,
+      "isUpsell": false
+    },
+    {
+      "name": "Hair Coloring",
+      "price": 800,
+      "duration": 60,
+      "category": "Hair",
+      "isPrimary": false,
+      "isUpsell": true
+    }
+  ]
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Services saved",
+  "nextStep": "capacity",
+  "servicesCount": 3
+}
+```
+
+**Validation:**
+- Each service must have `name`, `price`, `duration`, `category`
+- Valid categories: `Hair`, `Beard`, `Body`, `Add-on`
+
+**Side Effects:**
+- Updates `salon.services`
+- Updates `user.setupStep = 'capacity'` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+***
+
+#### **4.15.5 Save Capacity Setup (Step 4)**
+
+**Endpoint:** `POST /api/salon-setup/capacity`  
+**Access:** Private (Owner)  
+**Description:** Configure barber capacity [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Request:**
+```javascript
+{
+  "totalBarbers": 4,
+  "activeBarbers": 3,              // Optional, defaults to totalBarbers
+  "averageServiceDuration": 30     // Optional, defaults to 30 minutes
+}
+```
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Capacity setup saved",
+  "nextStep": "complete"
+}
+```
+
+**Side Effects:**
+- Updates `salon.totalBarbers`, `salon.activeBarbers`, `salon.averageServiceDuration`
+- Updates `user.setupStep = 'completed'` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+***
+
+#### **4.15.6 Complete Setup**
+
+**Endpoint:** `POST /api/salon-setup/complete`  
+**Access:** Private (Owner)  
+**Description:** Finalize setup and activate salon [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+**Response (200):**
+```javascript
+{
+  "success": true,
+  "message": "Setup completed successfully!",
+  "salon": {
+    "_id": "...",
+    "name": "StyleHub Men's Salon",
+    "isActive": true,
+    "isVerified": false  // Still needs admin verification
+  }
+}
+```
+
+**Validation:**
+- Checks all steps completed (profile, hours, services, capacity)
+
+**Side Effects:**
+- Sets `user.setupCompleted = true`
+- Sets `salon.isActive = true`
+- Salon now visible in public search (but marked unverified) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/7bc40e4a-31ef-4145-9048-ff6d6644958a/paste-3.txt)
+
+***
+
+## **5. REAL-TIME FEATURES (SOCKET.IO)**
+
+### **5.1 Connection & Authentication**
+
+**Client Connection:**
+```javascript
+const socket = io('http://100.112.160.11:3000', {
+  auth: {
+    token: '<JWT_TOKEN>'  // Same JWT from REST API
+  }
+});
+```
+
+**Server Authentication:**
+- Verifies JWT token on connection
+- Sets `socket.userId` from decoded token
+- Joins user to `user_<userId>` room [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+### **5.2 Room Management**
+
+**Client Joins Salon Room:**
+```javascript
+socket.emit('join_salon', { salonId: '60d5f484f1b2c72d88f8a1b2' });
+```
+
+**Server Response:**
+```javascript
+socket.on('joined_salon', (data) => {
+  console.log('Joined salon room:', data.salonId);
+});
+```
+
+**Client Leaves Salon Room:**
+```javascript
+socket.emit('leave_salon', { salonId: '60d5f484f1b2c72d88f8a1b2' });
+```
+
+***
+
+### **5.3 Real-Time Events**
+
+#### **5.3.1 Queue Updated**
+
+**Emitted When:**
+- New booking created
+- Booking cancelled
+- Walk-in added
+- Queue reordered
+- Scheduled booking arrives
+
+**Event:** `queue_updated`
+
+**Payload:**
+```javascript
+{
+  "salonId": "60d5f484f1b2c72d88f8a1b2",
+  "queueSize": 5,
+  "action": "new_booking" | "walk_in_added" | "booking_cancelled" | "scheduled_arrived"
+}
+```
+
+**Client Usage:**
+```javascript
+socket.on('queue_updated', (data) => {
+  console.log('Queue updated:', data);
+  // Refresh queue list
+  fetchQueue(data.salonId);
+});
+```
+
+***
+
+#### **5.3.2 Wait Time Updated**
+
+**Emitted When:**
+- Queue changes (booking added/removed/completed)
+- Barber count changes
+- Service started/completed
+
+**Event:** `wait_time_updated`
+
+**Payload (Personalized):**
+```javascript
+{
+  "salonId": "60d5f484f1b2c72d88f8a1b2",
+  "waitTime": {
+    "waitMinutes": 45,
+    "displayText": "~45 min wait",
+    "queueLength": 3,
+    "queuePosition": null,  // null if user not in queue, or 1, 2, 3...
+    "status": "busy",       // available|busy|very-busy|full|closed
+    "estimatedStartTime": "2026-01-24T07:15:00.000Z",
+    "isInQueue": false,     // true if user is in queue
+    "timestamp": 1737698700000
+  },
+  "timestamp": 1737698700000
+}
+```
+
+**Key Feature:** Each socket receives **personalized wait time** based on their `userId`:
+- **If user in queue:** Shows time until their turn (excludes people behind them)
+- **If user not in queue:** Shows total wait time if they join now
+
+**Client Usage:**
+```javascript
+socket.on('wait_time_updated', (data) => {
+  if (data.waitTime.isInQueue) {
+    console.log(`Your turn in ${data.waitTime.waitMinutes} minutes`);
+  } else {
+    console.log(`Current wait: ${data.waitTime.displayText}`);
+  }
+});
+```
+
+
+***
+
+#### **5.3.3 Service Started**
+
+**Event:** `service_started`
+
+**Payload:**
+```javascript
+{
+  "bookingId": "60d5f484f1b2c72d88f8a1b2"
+}
+```
+
+***
+
+#### **5.3.4 Service Completed**
+
+**Event:** `service_completed`
+
+**Payload:**
+```javascript
+{
+  "bookingId": "60d5f484f1b2c72d88f8a1b2",
+  "pointsEarned": 45  // Only sent to customer
+}
+```
+
+***
+
+#### **5.3.5 Booking Cancelled**
+
+**Event:** `booking_cancelled`
+
+**Payload:**
+```javascript
+{
+  "bookingId": "60d5f484f1b2c72d88f8a1b2"
+}
+```
+
+***
+
+#### **5.3.6 Booking No-Show**
+
+**Event:** `booking_no_show`
+
+**Payload:**
+```javascript
+{
+  "bookingId": "60d5f484f1b2c72d88f8a1b2"
+}
+```
+
+
+***
+
+#### **5.3.7 Priority Service Started**
+
+**Event:** `priority_started`
+
+**Payload:**
+```javascript
+{
+  "bookingId": "60d5f484f1b2c72d88f8a1b2",
+  "reason": "Senior citizen"
+}
+```
+
+***
+
+#### **5.3.8 Customer Arrived**
+
+**Event:** `customer_arrived`
+
+**Payload:**
+```javascript
+{
+  "bookingId": "60d5f484f1b2c72d88f8a1b2"
+}
+```
+
+***
+
+#### **5.3.9 Arrival Confirmed**
+
+**Event:** `arrival_confirmed` (sent to customer's personal room)
+
+**Payload:**
+```javascript
+{
+  "bookingId": "60d5f484f1b2c72d88f8a1b2",
+  "queuePosition": 4
+}
+```
+
+
+***
+
+#### **5.3.10 Booking Scheduled**
+
+**Event:** `booking_scheduled`
+
+**Payload:**
+```javascript
+{
+  "salonId": "60d5f484f1b2c72d88f8a1b2",
+  "bookingId": "...",
+  "scheduledDate": "2026-01-25",
+  "scheduledTime": "14:30"
+}
+```
+
+
+***
+
+### **5.4 Socket.IO Room Structure**
+
+```
+Global Namespace (/)
+├── salon_<salonId>        # All clients watching this salon
+│   ├── Customer sockets
+│   ├── Owner sockets
+│   └── Staff sockets
+│
+└── user_<userId>          # Personal room for each user
+    └── User's socket(s)
+```
+
+**Broadcasting Logic:**
+- `queue_updated`, `wait_time_updated` → Broadcast to `salon_<salonId>`
+- `service_started`, `service_completed`, `booking_cancelled` → Send to both `salon_<salonId>` and `user_<userId>`
+- `arrival_confirmed` → Send only to `user_<userId>` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+## **6. SERVICES & BUSINESS LOGIC**
+
+### **6.1 Notification Service**
+
+**File:** `services/notificationService.js`
+
+#### **6.1.1 Send to Device**
+
+```javascript
+await NotificationService.sendToDevice(fcmToken, {
+  title: '🔔 New Booking',
+  body: 'John Doe joined the queue',
+  data: {
+    type: 'new_booking',
+    bookingId: '...',
+    salonId: '...'
+  }
+});
+```
+
+**Features:**
+- Uses Firebase Cloud Messaging (FCM)
+- Android high priority
+- Click action: `FLUTTER_NOTIFICATION_CLICK` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **6.1.2 Send to Multiple Devices**
+
+```javascript
+await NotificationService.sendToMultipleDevices(
+  [fcmToken1, fcmToken2, fcmToken3],
+  { title, body, data }
+);
+```
+
+**Returns:** Success count [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **6.1.3 Pre-built Notification Methods**
+
+```javascript
+// New booking notification (to owner)
+await NotificationService.notifyNewBooking(owner, booking, customer, salon);
+// Sends: "🔔 New Booking - John Doe joined the queue at position 4"
+
+// Queue position update (to customer)
+await NotificationService.notifyQueueUpdate(user, booking, salon);
+// Sends: "Queue Update - You're now #3 at StyleHub. Estimated wait: 25 mins"
+
+// Almost ready (to customer when position = 1)
+await NotificationService.notifyAlmostReady(user, booking, salon);
+// Sends: "Almost Your Turn! - You're next in line at StyleHub"
+
+// Service started (to customer)
+await NotificationService.notifyBookingStarted(user, booking, salon);
+// Sends: "Service Started - Your service at StyleHub has started!"
+
+// Priority service started (to customer)
+await NotificationService.notifyPriorityStarted(user, booking, salon, reason);
+// Sends: "⚡ Priority Service Started - Your service at StyleHub has started as priority (Senior citizen)"
+
+// Service completed (to customer)
+await NotificationService.notifyBookingCompleted(user, booking, salon);
+// Sends: "Service Completed - Your service at StyleHub is complete! Please rate your experience."
+
+// Booking cancelled (to customer)
+await NotificationService.notifyBookingCancelled(user, booking, salon);
+// Sends: "Booking Cancelled - Your booking at StyleHub has been cancelled."
+
+// Salon closed (to customers in queue)
+await NotificationService.notifySalonClosed(customer, salon, reason);
+// Sends: "StyleHub is now closed - Reason: Emergency closure. Please check back later."
+```
+
+
+***
+
+### **6.2 Reminder Service**
+
+**File:** `services/reminderService.js`
+
+#### **6.2.1 Scheduler**
+
+```javascript
+// Start scheduler (in server.js)
+ReminderService.startScheduler();
+```
+
+**Runs every 5 minutes:**
+1. **Check Upcoming Bookings:** Find scheduled bookings with `estimatedStartTime` in next 30 minutes, send reminder
+2. **Check Turn Approaching:** Find bookings with `queuePosition = 1` or `2`, send "almost ready" notification [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+#### **6.2.2 Methods**
+
+```javascript
+// Check and send 30-min reminders
+await ReminderService.checkUpcomingBookings();
+
+// Check and send "your turn is next" alerts
+await ReminderService.checkTurnApproaching();
+```
+
+**Tracking:**
+- Sets `booking.reminderSent = true` to avoid duplicates
+- Sets `booking.turnNotificationSent = true` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+### **6.3 Wait Time Calculation Service**
+
+**File:** `services/waitTimeService.js`
+
+This is the **core algorithm** for personalized wait time calculation. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+#### **6.3.1 Calculate Wait Time (Core Method)**
+
+```javascript
+const waitTime = await WaitTimeService.calculateWaitTime(
+  salonId,     // Required
+  userId,      // Optional (null for anonymous)
+  salon        // Optional (salon document)
+);
+```
+
+**Return Object:**
+```javascript
+{
+  waitMinutes: 45,
+  displayText: "~45 min wait",
+  queueLength: 3,
+  queuePosition: null,  // or 1, 2, 3... if user in queue
+  status: "busy",       // available|busy|very-busy|full|closed
+  estimatedStartTime: Date,
+  isInQueue: false,     // true if userId in queue
+  timestamp: 1737698700000
+}
+```
+
+***
+
+#### **6.3.2 Wait Time Logic (PRD-Compliant)**
+
+**CASE 1: User is IN queue (userId provided + found in pending bookings)**
+
+```
+Wait Time = Sum of durations of ALL bookings BEFORE user in queue
+
+For each booking ahead of user:
+  - If in-progress: Add REMAINING time (totalDuration - elapsedTime)
+  - If pending: Add FULL duration
+
+EXCLUDES:
+  - User's own service time
+  - Everyone after user in queue
+```
+
+**Example:**
+```
+Queue:
+1. John (in-progress, 30 min service, 10 min elapsed) → Remaining: 20 min
+2. Alice (pending, 45 min service) → Full: 45 min
+3. Bob (pending, 30 min service) → Full: 30 min
+4. [CURRENT USER] (pending, 60 min service)
+5. Charlie (pending, 20 min service)
+
+User's Wait Time = 20 + 45 + 30 = 95 minutes
+Display: "Your turn in ~95 min"
+```
+
+**CASE 2: User is NOT in queue (userId not provided OR not found in queue)**
+
+```
+Wait Time = Sum of durations of ALL bookings in queue
+
+For each booking:
+  - If in-progress: Add REMAINING time
+  - If pending: Add FULL duration
+
+This represents: "If you join NOW, you'll wait this long"
+```
+
+**Example (same queue):**
+```
+Total Wait = 20 + 45 + 30 + 60 + 20 = 175 minutes
+Display: "~2h 55m wait"
+```
+
+
+***
+
+#### **6.3.3 Status Determination**
+
+```javascript
+if (waitMinutes === 0) {
+  status = 'available';
+} else if (waitMinutes > 45) {
+  status = 'very-busy';
+} else if (waitMinutes > 15) {
+  status = 'busy';
+} else {
+  status = 'available';
+}
+```
+
+**Special Statuses:**
+- `closed`: Salon `isOpen = false`
+- `busy`: Salon `busyMode = true` (walk-ins only)
+- `full`: Queue length exceeds `maxQueueSize` or `activeBarbers + 10`
+- `unavailable`: `activeBarbers = 0` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+#### **6.3.4 Display Text Formatting**
+
+```javascript
+WaitTimeService.formatWaitTime(minutes);
+
+// Examples:
+0 min      → "No wait"
+3 min      → "~0-5 min"
+25 min     → "~25 min wait"
+75 min     → "~1h 15m wait"
+120 min    → "~2h wait"
+```
+
+
+***
+
+#### **6.3.5 Get Wait Time for Salon (Wrapper)**
+
+```javascript
+const waitTime = await WaitTimeService.getWaitTimeForSalon(salon, userId);
+```
+
+**Handles edge cases:**
+- Returns `status: 'closed'` if `salon.isOpen = false`
+- Returns `status: 'unavailable'` if `activeBarbers = 0`
+- Calls `calculateWaitTime()` for normal cases [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+### **6.4 Wait Time Helpers**
+
+**File:** `utils/waitTimeHelpers.js`
+
+#### **6.4.1 Emit Wait Time Update (Broadcast)**
+
+```javascript
+await emitWaitTimeUpdate(salonId);
+```
+
+**What it does:**
+1. Gets all sockets connected to `salon_<salonId>` room
+2. For each socket:
+   - Retrieves `socket.userId` (set during authentication)
+   - Calculates **personalized wait time** for that user
+   - Emits `wait_time_updated` event to that socket only
+3. Result: Each user gets their own wait time [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Example Output:**
+```
+Socket A (user_123 in queue at position 2):
+  → "Your turn in ~30 min"
+
+Socket B (user_456 not in queue):
+  → "~95 min wait"
+
+Socket C (user_789 in queue at position 1, currently in-progress):
+  → "Your turn now!"
+```
+
+
+***
+
+#### **6.4.2 Attach Wait Times to Salons (Bulk)**
+
+```javascript
+const salonsWithWaitTime = await attachWaitTimesToSalons(salons, userId);
+```
+
+**Used in:**
+- `GET /api/salons` (salon listing)
+- `GET /api/salons/nearby` (geospatial search)
+
+**What it does:**
+- Takes array of salon documents
+- Calculates personalized wait time for each salon
+- Returns salons with `waitTime` field attached [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+### **6.5 Queue Position Management**
+
+#### **6.5.1 Update Queue Positions (Reorder)**
+
+```javascript
+await updateQueuePositions(salonId);
+```
+
+**What it does:**
+1. Fetches all `pending` and `in-progress` bookings, sorted by `queuePosition`
+2. Reassigns sequential positions (1, 2, 3, ...) to remove gaps
+3. Saves each booking
+4. Recalculates `estimatedStartTime` for each booking [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+**Called after:**
+- Booking cancelled
+- Booking completed
+- Booking skipped
+
+***
+
+#### **6.5.2 Reorder Queue Positions (Strict)**
+
+```javascript
+await _reorderQueuePositions(salonId);
+```
+
+**Similar to above but:**
+- Ensures no skipped bookings in reordering
+- More strict validation [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+***
+
+### **6.6 Update Salon Rating**
+
+```javascript
+await updateSalonRating(salonId);
+```
+
+**What it does:**
+1. Aggregates all completed bookings with ratings
+2. Calculates average rating
+3. Counts total reviews
+4. Updates `salon.averageRating` and `salon.totalReviews` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Called after:**
+- Customer submits review
+- Customer updates review
+
+***
+
+## **7. ERROR HANDLING**
+
+### **7.1 Standard Error Response**
+
+```javascript
+{
+  "success": false,
+  "message": "Error description",
+  "error": "Detailed error message (dev only)"
+}
+```
+
+**HTTP Status Codes:**
+- `200` - Success
+- `201` - Created (new resource)
+- `400` - Bad Request (validation error)
+- `401` - Unauthorized (missing/invalid JWT)
+- `403` - Forbidden (insufficient permissions)
+- `404` - Not Found
+- `500` - Internal Server Error
+
+***
+
+### **7.2 Common Error Scenarios**
+
+#### **7.2.1 Authentication Errors**
+
+```javascript
+// Missing JWT token
+{
+  "success": false,
+  "message": "No token, authorization denied"
+}
+
+// Invalid/expired token
+{
+  "success": false,
+  "message": "Token is not valid"
+}
+
+// User deactivated
+{
+  "success": false,
+  "message": "User account is deactivated"
+}
+```
+
+***
+
+#### **7.2.2 Authorization Errors**
+
+```javascript
+// Wrong role
+{
+  "success": false,
+  "message": "Access denied. Admin role required."
+}
+
+// Not salon owner
+{
+  "success": false,
+  "message": "Not authorized to update this salon"
+}
+```
+
+***
+
+#### **7.2.3 Validation Errors**
+
+```javascript
+// Missing required fields
+{
+  "success": false,
+  "message": "Salon ID and services are required"
+}
+
+// Invalid data
+{
+  "success": false,
+  "message": "Rating must be between 1 and 5"
+}
+
+// Business rule violation
+{
+  "success": false,
+  "message": "You already have an active booking at this salon"
+}
+```
+
+***
+
+#### **7.2.4 Resource Not Found**
+
+```javascript
+{
+  "success": false,
+  "message": "Salon not found"
+}
+```
+
+***
+
+#### **7.2.5 State Errors**
+
+```javascript
+// Cannot perform action in current state
+{
+  "success": false,
+  "message": "Cannot start service - booking is cancelled"
+}
+
+// Salon closed
+{
+  "success": false,
+  "message": "Salon is currently closed"
+}
+
+// Queue full
+{
+  "success": false,
+  "message": "Queue is full. Please try walk-in or schedule booking."
+}
+
+// Daily limit reached
+{
+  "success": false,
+  "message": "Daily priority limit reached (5/5 used)"
+}
+```
+
+***
+
+## **8. COMPLETE WORKFLOWS**
+
+### **8.1 Customer Books Salon (Immediate Queue)**
+
+```
+┌─────────────┐
+│ 1. Customer │
+│    Login    │
+└──────┬──────┘
+       │
+       │ POST /api/auth/verify-token
+       │ { idToken, phone, appType: "customer" }
+       ▼
+┌─────────────────┐
+│ Get JWT token   │
+└──────┬──────────┘
+       │
+       │ GET /api/salons/nearby?lat=19.0760&lng=72.8777&radius=5
+       │ Authorization: Bearer <JWT>
+       ▼
+┌─────────────────────────┐
+│ Browse salons with      │
+│ personalized wait times │
+│ (isInQueue: false)      │
+└──────┬──────────────────┘
+       │
+       │ socket.emit('join_salon', { salonId })
+       │ Listen to wait_time_updated events
+       ▼
+┌─────────────────────────┐
+│ Select services         │
+└──────┬──────────────────┘
+       │
+       │ POST /api/bookings/join-queue
+       │ { salonId, services, paymentMethod: "cash" }
+       ▼
+┌─────────────────────────┐
+│ Booking created         │
+│ Status: pending         │
+│ Position: 4             │
+└──────┬──────────────────┘
+       │
+       │ SIDE EFFECTS:
+       │ ✅ FCM: "You're #4 at StyleHub. Wait: 45 mins"
+       │ ✅ Socket: wait_time_updated (now isInQueue: true)
+       │ ✅ Owner FCM: "John Doe joined queue at #4"
+       ▼
+┌─────────────────────────┐
+│ Customer receives       │
+│ personalized wait time: │
+│ "Your turn in ~45 min"  │
+└──────┬──────────────────┘
+       │
+       │ As queue moves, socket events:
+       │ wait_time_updated → "Your turn in ~30 min" (position 3)
+       │ wait_time_updated → "Your turn in ~15 min" (position 2)
+       ▼
+┌─────────────────────────┐
+│ Position = 1            │
+│ FCM: "Almost Your Turn!"│
+└──────┬──────────────────┘
+       │
+       │ Owner: POST /api/queue/:salonId/start/:bookingId
+       ▼
+┌─────────────────────────┐
+│ Status: in-progress     │
+│ FCM: "Service Started"  │
+└──────┬──────────────────┘
+       │
+       │ Owner: POST /api/queue/:salonId/complete/:bookingId
+       ▼
+┌─────────────────────────────────┐
+│ Status: completed               │
+│ Payment: auto-marked as paid    │
+│ Loyalty: +45 points awarded     │
+│ FCM: "Service Complete! Rate us"│
+└──────┬──────────────────────────┘
+       │
+       │ POST /api/reviews/booking/:bookingId
+       │ { rating: 5, review: "Great service!" }
+       ▼
+┌─────────────────────────┐
+│ Review submitted        │
+│ Salon rating updated    │
+└─────────────────────────┘
+```
+
+***
+
+### **8.2 Salon Owner Onboarding (Setup Wizard)**
+
+```
+┌─────────────┐
+│ Owner Login │
+└──────┬──────┘
+       │
+       │ POST /api/auth/verify-token
+       │ { idToken, phone, appType: "salon" }
+       ▼
+┌─────────────────────────────┐
+│ Response:                   │
+│ role: "owner"               │
+│ setupRequired: true         │
+│ setupStep: "profile"        │
+└──────┬──────────────────────┘
+       │
+       │ GET /api/salon-setup/status
+       ▼
+┌─────────────────────────────┐
+│ Step 1: Profile             │
+│ POST /api/salon-setup/profile│
+│ { name, address, lat, lng } │
+└──────┬──────────────────────┘
+       │
+       ▼
+┌─────────────────────────────┐
+│ Step 2: Hours               │
+│ POST /api/salon-setup/hours │
+│ { hours: { monday: {...} } }│
+└──────┬──────────────────────┘
+       │
+       ▼
+┌─────────────────────────────┐
+│ Step 3: Services            │
+│ POST /api/salon-setup/services│
+│ { services: [{...}] }       │
+└──────┬──────────────────────┘
+       │
+       ▼
+┌─────────────────────────────┐
+│ Step 4: Capacity            │
+│ POST /api/salon-setup/capacity│
+│ { totalBarbers: 4 }         │
+└──────┬──────────────────────┘
+       │
+       │ POST /api/salon-setup/complete
+       ▼
+┌─────────────────────────────┐
+│ Setup Complete!             │
+│ user.setupCompleted: true   │
+│ salon.isActive: true        │
+│ salon.isVerified: false     │
+└──────┬──────────────────────┘
+       │
+       │ Admin verifies salon:
+       │ PATCH /api/admin/salons/:id/verify
+       ▼
+┌─────────────────────────────┐
+│ Salon live & discoverable  │
+└─────────────────────────────┘
+```
+
+***
+
+### **8.3 Walk-In Customer Flow**
+
+```
+┌────────────────────────┐
+│ Customer walks into    │
+│ salon (no app/phone)   │
+└──────┬─────────────────┘
+       │
+       │ Staff: POST /api/queue/:salonId/walk-in
+       │ { services: [{...}] }  // No name/phone
+       ▼
+┌─────────────────────────────────┐
+│ System generates token: "0001"  │
+│ Booking created:                │
+│ - walkInToken: "0001"           │
+│ - userId: null                  │
+│ - arrived: true (auto)          │
+│ - queuePosition: 6              │
+└──────┬──────────────────────────┘
+       │
+       │ Staff shows customer: "Your token is 0001"
+       │ (Optionally print receipt)
+       ▼
+┌─────────────────────────────────┐
+│ Queue displayed as:             │
+│ "Token #0001" (no name/phone)   │
+└──────┬──────────────────────────┘
+       │
+       │ Service flow continues normally:
+       │ Start → Complete → No loyalty points
+       ▼
+┌─────────────────────────────────┐
+│ Completed & paid                │
+│ (No FCM notifications sent)     │
+└─────────────────────────────────┘
+```
+
+**Alternate Flow (With Phone):**
+```
+Staff: POST /api/queue/:salonId/walk-in
+{ phone: "+919876543210", services: [{...}] }
+
+→ System creates/links user account
+→ No token generated (uses name)
+→ Future bookings linked to same account
+→ Loyalty points awarded
+```
+
+***
+
+### **8.4 Scheduled Booking Flow**
+
+```
+┌─────────────┐
+│ Customer    │
+└──────┬──────┘
+       │
+       │ GET /api/bookings/available-slots/:salonId?date=2026-01-25
+       ▼
+┌─────────────────────────────┐
+│ Available 30-min slots      │
+│ 09:00 ✅ | 09:30 ✅ | 10:00 ❌│
+└──────┬──────────────────────┘
+       │
+       │ POST /api/bookings/schedule
+       │ { salonId, services, scheduledDate: "2026-01-25", scheduledTime: "14:30" }
+       ▼
+┌─────────────────────────────┐
+│ Booking created:            │
+│ - bookingType: "scheduled"  │
+│ - status: "pending"         │
+│ - arrived: false            │
+│ - queuePosition: 0          │
+└──────┬──────────────────────┘
+       │
+       │ Owner: GET /api/scheduled-bookings/:salonId/today
+       │ (on day of booking)
+       ▼
+┌─────────────────────────────┐
+│ See scheduled booking       │
+│ Wait for customer arrival   │
+└──────┬──────────────────────┘
+       │
+       │ Customer arrives
+       │ Owner: PATCH /api/scheduled-bookings/:bookingId/mark-arrived
+       ▼
+┌─────────────────────────────┐
+│ Booking updated:            │
+│ - arrived: true             │
+│ - arrivedAt: now            │
+│ - queuePosition: 3 (assigned)│
+│ - Now joins live queue!     │
+└──────┬──────────────────────┘
+       │
+       │ Continue as normal queue booking
+       │ (start → complete)
+       ▼
+┌─────────────────────────────┐
+│ Completed                   │
+└─────────────────────────────┘
+
+ALTERNATE: No-Show
+Owner: PATCH /api/scheduled-bookings/:bookingId/no-show
+→ status: "no-show"
+→ Customer not charged
+```
+
+***
+
+### **8.5 Priority Queue Insertion**
+
+```
+┌─────────────────────────┐
+│ Regular queue:          │
+│ 1. Alice (pending)      │
+│ 2. Bob (in-progress)    │
+│ 3. Charlie (pending)    │
+│ 4. David (pending)      │
+└──────┬──────────────────┘
+       │
+       │ Owner: POST /api/queue/:salonId/start-priority/:bookingId
+       │ { reason: "Senior citizen" }
+       │ (bookingId = David's booking)
+       ▼
+┌─────────────────────────────────┐
+│ System checks:                  │
+│ ✅ priorityUsedToday: 2/5       │
+│ ✅ Only Owner/Manager can do    │
+└──────┬──────────────────────────┘
+       │
+       │ Reorder queue:
+       ▼
+┌─────────────────────────────────┐
+│ New queue:                      │
+│ 1. David (in-progress) ⚡       │
+│ 2. Alice (pending)              │
+│ 3. Bob (in-progress)            │
+│ 4. Charlie (pending)            │
+└──────┬──────────────────────────┘
+       │
+       │ SIDE EFFECTS:
+       │ ✅ David FCM: "⚡ Priority Service Started (Senior citizen)"
+       │ ✅ PriorityLog created (audit trail)
+       │ ✅ salon.priorityUsedToday = 3
+       │ ✅ Socket: queue_updated to all
+       │ ✅ Wait times recalculated
+       ▼
+┌─────────────────────────────────┐
+│ Service continues normally      │
+└─────────────────────────────────┘
+```
+
+**Daily Reset:**
+- `salon.priorityUsedToday` resets to 0 at midnight
+- Tracked by `salon.lastPriorityReset` date comparison
+
+***
+
+### **8.6 Admin Manages Platform**
+
+```
+┌─────────────┐
+│ Admin Login │
+└──────┬──────┘
+       │
+       │ POST /api/admin/auth/login
+       │ { email: "admin@lynin.com", firebaseToken }
+       ▼
+┌─────────────────────────┐
+│ Admin Dashboard         │
+│ GET /api/admin/statistics│
+└──────┬──────────────────┘
+       │
+       ├─→ GET /api/admin/users
+       │   → View all users
+       │   → DELETE /api/admin/users/:userId (soft delete)
+       │
+       ├─→ GET /api/admin/salons
+       │   → View all salons
+       │   → PATCH /api/admin/salons/:id/verify (verify salon)
+       │   → PATCH /api/admin/salons/:id/disable (disable salon)
+       │
+       ├─→ GET /api/admin/bookings
+       │   → Monitor all bookings
+       │
+       ├─→ PUT /api/faqs (manage FAQs)
+       │   PUT /api/feature-flags (toggle live chat)
+       │   PUT /api/app-info (update policies)
+       │
+       └─→ GET /api/admin/audit-logs
+           → View all admin actions (full transparency)
+```
+
+***
+
+## **9. ADVANCED FEATURES**
+
+### **9.1 Staff Assignment System**
+
+**Enabled per salon:** Admin sets `salon.staffSystemEnabled = true`
+
+**Flow:**
+1. Owner adds staff: `POST /api/staff`
+2. When booking created, owner assigns staff: `PUT /api/bookings/:id/assign-staff`
+3. Staff sees their bookings: `GET /api/bookings/staff/:staffId`
+4. Track performance: `GET /api/staff/:id/performance`
+5. Staff ratings calculated from booking reviews [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+### **9.2 Multi-Salon Owner Support**
+
+- User can own multiple salons (no limit)
+- Each salon has separate queue, settings, staff
+- `GET /api/salons/my-salons` returns all owned salons
+- Switch between salons in app by passing `salonId` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+### **9.3 Loyalty Points System**
+
+**Earning:**
+- 1 point per ₹10 spent
+- Awarded on service completion (auto with payment)
+- Only for registered users (not walk-ins without phone)
+
+**Redemption:**
+- Not yet implemented (frontend shows balance)
+- Planned: Redeem for discounts [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/50af21b9-0506-4843-bfbe-61d0831ba4cf/paste.txt)
+
+***
+
+### **9.4 Geospatial Search**
+
+**MongoDB 2dsphere Index:**
+```javascript
+salon.location.coordinates = [longitude, latitude]  // [lng, lat]
+```
+
+**Query:**
+```javascript
+Salon.find({
+  'location.coordinates': {
+    $near: {
+      $geometry: { type: 'Point', coordinates: [lng, lat] },
+      $maxDistance: radius * 1000  // meters
+    }
+  }
+})
+```
+
+
+***
+
+### **9.5 Salon Closure with Queue Handling**
+
+**Graceful Closure:**
+```
+PUT /api/salons/:id/close-with-reason
+{ reason: "Emergency closure" }
+```
+
+**Process:**
+1. Sets `isOpen: false`
+2. Finds all pending/in-progress bookings
+3. Cancels each with reason
+4. Sends FCM to each customer: "Salon closed - Emergency closure"
+5. Logs to `salon.closureHistory` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+### **9.6 Busy Mode (Walk-ins Only)**
+
+**Purpose:** High traffic, owner wants control
+
+**Activation:**
+```
+PUT /api/salons/:id/set-busy-mode
+{ busyMode: true }
+```
+
+**Effect:**
+- Online bookings blocked (API returns `status: 'busy'`)
+- Wait time shows "Walk-ins only"
+- Customers must come in person
+- Staff adds via `POST /api/queue/:salonId/walk-in` [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+***
+
+### **9.7 Admin Audit Logging**
+
+**All destructive admin actions logged:**
+- User deletion
+- Salon verification
+- Salon disable/enable
+- User restoration
+
+**AdminAuditLog Schema:**
+```javascript
+{
+  adminId: ObjectId (ref: User),
+  adminName: String,
+  adminEmail: String,
+  actionType: String,  // "user_soft_delete", "salon_verify", etc.
+  entityType: String,  // "user", "salon", "booking"
+  entityId: String,
+  previousState: Object,
+  newState: Object,
+  reason: String,
+  ipAddress: String,
+  userAgent: String,
+  timestamp: Date
+}
+```
+
+**Retrieval:**
+```
+GET /api/admin/audit-logs?actionType=user_soft_delete&startDate=2026-01-01
+```
+
+
+***
+
+## **10. PERFORMANCE & SCALABILITY**
+
+### **10.1 Database Indexes**
+
+**User:**
+- `phone` (unique)
+- `firebaseUid` (unique)
+
+**Salon:**
+- `location.coordinates` (2dsphere)
+- `ownerId`
+- `city`
+
+**Booking:**
+- `{ userId, status }`
+- `{ salonId, status }`
+- `{ salonId, queuePosition }`
+- `{ salonId, bookingType, scheduledDate }`
+- `bookingType`
+- `scheduledDate`
+- `walkInToken`
+- `assignedStaffId`
+
+**Staff:**
+- `salonId`
+
+***
+
+### **10.2 Caching Strategy**
+
+**Redis/In-Memory Caching (Implied but not fully implemented):**
+- FAQs: 24-hour cache
+- App Info: 24-hour cache
+- Feature Flags: 24-hour cache [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+**Future Optimization:**
+- Cache salon listings by city
+- Cache popular searches
+- Cache wait times (5-second TTL)
+
+***
+
+### **10.3 Socket.IO Optimization**
+
+**Personalized Broadcasting:**
+- Instead of broadcasting same wait time to all users
+- Each socket calculates personalized wait time
+- Reduces data transfer, improves UX [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/3598ee82-5ca6-44a3-a646-3e580680b4a4/paste-2.txt)
+
+**Room-based Broadcasting:**
+- Only users in `salon_<salonId>` room receive updates
+- No global broadcasts (reduces noise)
+
+***
+
+### **10.4 Queue Management Optimization**
+
+**Atomic Operations:**
+- Walk-in token generation uses `findOne().sort({ walkInToken: -1 })` to avoid race conditions
+- Queue position assignment uses `countDocuments()` + 1
+
+**Batch Updates:**
+- `updateQueuePositions()` updates all bookings in single transaction [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+## **11. SECURITY CONSIDERATIONS**
+
+### **11.1 Authentication Security**
+
+- Firebase token verified server-side (cannot be faked)
+- JWT expires in 30 days
+- JWT includes `userId`, `role`, `isAdmin`
+- All protected routes verify JWT via middleware [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+### **11.2 Authorization Checks**
+
+**Role-based:**
+```javascript
+// Middleware checks
+protect()         // Requires valid JWT
+adminOnly()       // Requires role = 'admin'
+checkRole(['owner', 'manager'])  // Multiple roles
+```
+
+**Resource-based:**
+```javascript
+// Only salon owner can update salon
+if (salon.ownerId.toString() !== req.user._id.toString()) {
+  return res.status(403).json({ message: 'Not authorized' });
+}
+```
+
+
+***
+
+### **11.3 Data Validation**
+
+- All inputs validated (required fields, data types, ranges)
+- Phone format validation
+- Email format validation
+- Service category enum validation
+- Rating 1-5 validation [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/60458d4b-705f-467b-8987-f4cec7c19b01/paste.txt)
+
+***
+
+### **11.4 Soft Deletes**
+
+- Users marked `isActive: false` (not deleted from DB)
+- Salons can be restored by admin
+- Audit trail maintained [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/108582419/d60737e8-7fc1-4d28-b8c7-b0e0d068d5d4/paste.txt)
+
+***
+
+### **11.5 Rate Limiting**
+
+**Not yet implemented but recommended:**
+```javascript
+// Express rate limiter
+app.use('/api/', rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 100                   // Max 100 requests per IP
+}));
+```
+
+***
+
+## **12. DEPLOYMENT & CONFIGURATION**
+
+### **12.1 Environment Variables**
 
 ```bash
-# Server Configuration
-PORT=5000
-NODE_ENV=development # development | production | test
+# Server
+PORT=3000
+NODE_ENV=development
 
 # Database
-MONGODB_URI=mongodb://localhost:27017/salon_booking
-MONGODB_URI_PROD=mongodb+srv://username:password@cluster.mongodb.net/salon_booking
+MONGO_URI=mongodb://localhost:27017/lynin
 
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-min-32-chars
-JWT_EXPIRES_IN=30d # Token expiration time
+# JWT
+JWT_SECRET=your_super_secret_jwt_key_here
+JWT_EXPIRE=30d
 
-# Cloudinary (Image Storage)
-CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=your-api-key
-CLOUDINARY_API_SECRET=your-api-secret
+# Firebase
+FIREBASE_PROJECT_ID=lynin-app
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@lynin-app.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 
-# SMS Service (for OTP)
-TWILIO_ACCOUNT_SID=your-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_PHONE_NUMBER=+1234567890
-
-# Email Service (Optional)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-
-# Google Maps API (for geocoding)
-GOOGLE_MAPS_API_KEY=your-google-maps-api-key
-
-# Redis (for caching and rate limiting)
-REDIS_URL=redis://localhost:6379
-REDIS_PASSWORD=your-redis-password
-
-# Frontend URL (for CORS)
-FRONTEND_URL=http://localhost:3000
-FRONTEND_URL_PROD=https://app.trimzo.com
-
-# Admin Credentials (Initial Setup)
-ADMIN_EMAIL=admin@trimzo.com
-ADMIN_PASSWORD=secure-admin-password
-
-# Payment Gateway (Future)
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-
-# Logging
-LOG_LEVEL=info # error | warn | info | debug
-LOG_FILE_PATH=./logs/app.log
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000 # 15 minutes in milliseconds
-RATE_LIMIT_MAX_REQUESTS=100
-
-# File Upload
-MAX_FILE_SIZE=5242880 # 5MB in bytes
-ALLOWED_FILE_TYPES=image/jpeg,image/png,image/jpg
-```
-
-### Environment-Specific Configuration
-
-**Development (.env.development):**
-```bash
-NODE_ENV=development
-MONGODB_URI=mongodb://localhost:27017/salon_booking_dev
-LOG_LEVEL=debug
-RATE_LIMIT_MAX_REQUESTS=1000
-```
-
-**Production (.env.production):**
-```bash
-NODE_ENV=production
-MONGODB_URI=${MONGODB_URI_PROD}
-LOG_LEVEL=warn
-RATE_LIMIT_MAX_REQUESTS=100
+# CORS
+ALLOWED_ORIGINS=http://localhost:3000,https://lynin.com
 ```
 
 ***
 
-## Testing Guidelines
+### **12.2 Firebase Admin SDK Initialization**
 
-### API Testing with Postman/Thunder Client
+```javascript
+// config/firebase.js
+const admin = require('firebase-admin');
 
-**Collection Structure:**
-```
-Salon Booking API/
-├── Auth/
-│   ├── Register User
-│   ├── Login User
-│   ├── Send OTP
-│   └── Verify OTP
-├── Salons/
-│   ├── Get Nearby Salons
-│   ├── Get Salon by ID
-│   └── Create Salon (Owner)
-├── Bookings/
-│   ├── Create Booking
-│   ├── Get My Bookings
-│   └── Cancel Booking
-└── Reviews/
-    ├── Create Review
-    └── Get Salon Reviews
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+  })
+});
+
+module.exports = admin;
 ```
 
-**Environment Variables in Postman:**
-```json
+***
+
+### **12.3 MongoDB Connection**
+
+```javascript
+// config/database.js
+const mongoose = require('mongoose');
+
+const connectDB = async () => {
+  await mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  });
+  console.log('✅ MongoDB Connected');
+};
+```
+
+***
+
+### **12.4 Server Initialization**
+
+```javascript
+// server.js
+const express = require('express');
+const http = require('http');
+const socketio = require('socket.io');
+const ReminderService = require('./services/reminderService');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketio(server, { cors: { origin: '*' } });
+
+// Make io globally accessible
+global.io = io;
+
+// Socket.IO authentication & room management
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth.token;
+  // Verify JWT, set socket.userId
+  next();
+});
+
+// Start reminder scheduler
+ReminderService.startScheduler();
+
+server.listen(3000, () => {
+  console.log('🚀 Server running on port 3000');
+});
+```
+
+***
+
+## **13. API TESTING**
+
+### **13.1 Sample Postman Collection**
+
+**Authentication:**
+```
+POST http://100.112.160.11:3000/api/auth/verify-token
+Headers:
+  Content-Type: application/json
+Body:
 {
-  "baseUrl": "http://localhost:5000/api",
-  "token": "{{login_token}}",
-  "userId": "{{current_user_id}}",
-  "salonId": "{{test_salon_id}}"
+  "idToken": "eyJhbGciOiJSUzI1NiIs...",
+  "phone": "+919876543210",
+  "appType": "customer"
 }
 ```
 
-**Pre-request Script (Auto-login):**
-```javascript
-// Auto-refresh token if expired
-const token = pm.environment.get("token");
-if (!token) {
-  pm.sendRequest({
-    url: pm.environment.get("baseUrl") + "/auth/login",
-    method: 'POST',
-    header: { 'Content-Type': 'application/json' },
-    body: {
-      mode: 'raw',
-      raw: JSON.stringify({
-        identifier: "test@example.com",
-        password: "Test123!"
-      })
+**Get Nearby Salons:**
+```
+GET http://100.112.160.11:3000/api/salons/nearby?latitude=19.0760&longitude=72.8777&radius=5
+Headers:
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+```
+
+**Join Queue:**
+```
+POST http://100.112.160.11:3000/api/bookings/join-queue
+Headers:
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+  Content-Type: application/json
+Body:
+{
+  "salonId": "60d5f484f1b2c72d88f8a1b2",
+  "services": [
+    {
+      "serviceId": "60d5f484f1b2c72d88f8a1b3",
+      "name": "Haircut",
+      "price": 300,
+      "duration": 30
     }
-  }, (err, res) => {
-    if (!err) {
-      const data = res.json();
-      pm.environment.set("token", data.data.token);
-    }
-  });
+  ],
+  "paymentMethod": "cash"
 }
 ```
 
-### Unit Testing Example (Jest)
+***
 
-```javascript
-// tests/auth.test.js
-const request = require('supertest');
-const app = require('../server');
-const User = require('../models/User');
+## **14. CHANGELOG & VERSION HISTORY**
 
-describe('Auth API', () => {
-  beforeAll(async () => {
-    await User.deleteMany({}); // Clean database
-  });
+**Version 2.0 (January 2026):**
+- ✅ Personalized wait time calculation
+- ✅ Walk-in token system (4-digit)
+- ✅ Priority queue with daily limits
+- ✅ Scheduled booking system
+- ✅ Staff management system
+- ✅ Admin audit logging
+- ✅ FAQ caching
+- ✅ Feature flags (live chat toggle)
+- ✅ Salon closure with reason tracking
+- ✅ Auto-payment marking on completion
+- ✅ Service categories (Hair, Beard, Body, Add-on)
 
-  describe('POST /api/auth/register', () => {
-    it('should register a new user', async () => {
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({
-          name: 'Test User',
-          email: 'test@example.com',
-          phone: '+919876543210',
-          password: 'Test123!'
-        })
-        .expect(201);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.user.email).toBe('test@example.com');
-      expect(response.body.data.token).toBeDefined();
-    });
-
-    it('should reject duplicate email', async () => {
-      await request(app)
-        .post('/api/auth/register')
-        .send({
-          name: 'Test User',
-          email: 'test@example.com',
-          phone: '+919876543211',
-          password: 'Test123!'
-        })
-        .expect(409);
-    });
-
-    it('should reject weak password', async () => {
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({
-          name: 'Test User',
-          email: 'test2@example.com',
-          phone: '+919876543212',
-          password: '123' // Too short
-        })
-        .expect(400);
-
-      expect(response.body.error.code).toBe('VALIDATION_ERROR');
-    });
-  });
-
-  describe('POST /api/auth/login', () => {
-    it('should login with valid credentials', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({
-          identifier: 'test@example.com',
-          password: 'Test123!'
-        })
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.token).toBeDefined();
-    });
-
-    it('should reject invalid password', async () => {
-      await request(app)
-        .post('/api/auth/login')
-        .send({
-          identifier: 'test@example.com',
-          password: 'WrongPassword'
-        })
-        .expect(401);
-    });
-  });
-});
-```
+**Version 1.0 (June 2025):**
+- Initial release
+- Basic queue management
+- Firebase authentication
+- Geospatial search
+- Push notifications
 
 ***
 
-## Future Improvements
+## **15. SUPPORT & CONTACT**
 
-### Phase 1 (Q1 2026) - Performance & Reliability
+**Backend Maintained By:** Lynin Development Team  
+**Support Email:** support@lynin.com  
+**Documentation Updated:** January 24, 2026
 
-1. **WebSocket Integration:**
-   - Real-time queue position updates
-   - Live booking status changes
-   - Push notifications via Socket.io
-   - Reduce polling frequency
-
-2. **Redis Caching Layer:**
-   - Cache nearby salon queries
-   - Cache salon details for 10 minutes
-   - Cache user sessions
-   - Reduce database load by 60%
-
-3. **Database Optimization:**
-   - Implement read replicas for heavy read operations
-   - Archive old bookings (>6 months) to separate collection
-   - Optimize geospatial queries with compound indexes
-   - Implement database connection pooling
-
-4. **CDN Integration:**
-   - Serve static assets via CloudFront/Cloudflare
-   - Edge caching for salon images
-   - Reduce image load time by 80%
-
-### Phase 2 (Q2 2026) - Features
-
-1. **Payment Integration:**
-   - Stripe/Razorpay integration
-   - Online booking deposits
-   - Digital wallet support
-   - Refund management
-
-2. **Advanced Queue Management:**
-   - Allow users to reserve specific time slots
-   - Dynamic pricing based on demand
-   - VIP queue (premium users)
-   - Automated no-show detection
-
-3. **Loyalty Program:**
-   - Points system for bookings
-   - Referral rewards
-   - Membership tiers
-   - Exclusive deals for loyal customers
-
-4. **Advanced Analytics:**
-   - Revenue forecasting
-   - Customer lifetime value (CLV)
-   - Churn prediction
-   - A/B testing framework
-
-### Phase 3 (Q3 2026) - Scale
-
-1. **Multi-language Support:**
-   - i18n implementation
-   - Language detection from Accept-Language header
-   - Localized content
-
-2. **Microservices Architecture:**
-   - Separate services for: Auth, Bookings, Payments, Notifications
-   - Message queue (RabbitMQ/Kafka) for async communication
-   - Service mesh (Istio) for orchestration
-
-3. **Machine Learning Integration:**
-   - Wait time prediction model
-   - Personalized salon recommendations
-   - Demand forecasting
-   - Fraud detection
-
-4. **Mobile App Push Notifications:**
-   - FCM integration for Flutter
-   - Booking reminders
-   - Queue position updates
-   - Promotional campaigns
-
-### Phase 4 (Q4 2026) - Advanced Features
-
-1. **Video Consultation:**
-   - Integrated video calls (Twilio/Agora)
-   - Virtual salon tours
-   - Pre-booking consultations
-
-2. **AI Chatbot:**
-   - Customer support automation
-   - Booking via chat
-   - FAQ handling
-
-3. **Salon Management Tools:**
-   - Inventory management
-   - Staff scheduling
-   - Commission tracking
-   - CRM integration
-
-4. **Social Features:**
-   - Share booking experiences
-   - Before/after photo galleries
-   - Social login (Google/Facebook)
-   - Influencer partnerships
-
-***
-
-## Monitoring & Logging
-
-### Logging Implementation
-
-```javascript
-// utils/logger.js
-const winston = require('winston');
-
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  defaultMeta: { service: 'salon-booking-api' },
-  transports: [
-    new winston.transports.File({ 
-      filename: 'logs/error.log', 
-      level: 'error' 
-    }),
-    new winston.transports.File({ 
-      filename: 'logs/combined.log' 
-    })
-  ]
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.simple()
-  }));
-}
-
-module.exports = logger;
-```
-
-### Monitoring Metrics
-
-**Key Metrics to Track:**
-1. **API Performance:**
-   - Response time (p50, p95, p99)
-   - Request rate (requests/second)
-   - Error rate (%)
-
-2. **Business Metrics:**
-   - Active users (DAU, MAU)
-   - Bookings created/completed
-   - Conversion rate (views → bookings)
-   - Average booking value
-
-3. **System Health:**
-   - Database connection pool usage
-   - Memory usage
-   - CPU usage
-   - Disk I/O
-
-4. **Error Tracking:**
-   - 4xx error breakdown
-   - 5xx error frequency
-   - Failed authentication attempts
-   - Payment failures
-
-**Tools:**
-- **APM:** New Relic / Datadog
-- **Error Tracking:** Sentry
-- **Logs:** ELK Stack (Elasticsearch, Logstash, Kibana)
-- **Uptime:** Pingdom / UptimeRobot
-
-***
-
-## Deployment Guide
-
-### Production Deployment Checklist
-
-```
-□ Environment variables configured
-□ Database indexes created
-□ MongoDB Atlas cluster provisioned
-□ Cloudinary account configured
-□ SMS service (Twilio) configured
-□ Domain and SSL certificate ready
-□ CORS whitelist updated
-□ Rate limiting enabled
-□ Logging configured
-□ Monitoring tools integrated
-□ Backup strategy implemented
-□ CI/CD pipeline configured
-□ Load balancer configured
-□ Health check endpoint implemented
-□ Graceful shutdown handling
-□ Database migration scripts ready
-```
-
-### Docker Deployment
-
-**Dockerfile:**
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY . .
-
-EXPOSE 5000
-
-CMD ["node", "server.js"]
-```
-
-**docker-compose.yml:**
-```yaml
-version: '3.8'
-
-services:
-  api:
-    build: .
-    ports:
-      - "5000:5000"
-    environment:
-      - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongo:27017/salon_booking
-    depends_on:
-      - mongo
-      - redis
-
-  mongo:
-    image: mongo:6
-    volumes:
-      - mongo-data:/data/db
-    ports:
-      - "27017:27017"
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-volumes:
-  mongo-data:
-```
-
-### Health Check Endpoint
-
-```javascript
-// routes/health.js
-router.get('/health', async (req, res) => {
-  const health = {
-    uptime: process.uptime(),
-    timestamp: Date.now(),
-    status: 'OK',
-    checks: {
-      database: 'unknown',
-      redis: 'unknown'
-    }
-  };
-
-  try {
-    // Check MongoDB
-    await mongoose.connection.db.admin().ping();
-    health.checks.database = 'healthy';
-  } catch (error) {
-    health.checks.database = 'unhealthy';
-    health.status = 'DEGRADED';
-  }
-
-  try {
-    // Check Redis
-    await redisClient.ping();
-    health.checks.redis = 'healthy';
-  } catch (error) {
-    health.checks.redis = 'unhealthy';
-    health.status = 'DEGRADED';
-  }
-
-  const statusCode = health.status === 'OK' ? 200 : 503;
-  res.status(statusCode).json(health);
-});
-```
-
-***
-
-## Support & Contact
-
-### API Documentation Updates
-This documentation should be updated whenever:
-- New endpoints are added
-- Request/response formats change
-- Authentication mechanism changes
-- Business logic modifications occur
-
-### For Developers
-- **Repository:** github.com/trimzo/api
-- **Issue Tracker:** github.com/trimzo/api/issues
-- **Wiki:** github.com/trimzo/api/wiki
-- **API Changelog:** github.com/trimzo/api/CHANGELOG.md
-
-### For Partners/Integrators
-- **Developer Portal:** developer.trimzo.com
-- **Support Email:** api-support@trimzo.com
-- **API Status:** status.trimzo.com
-
-***
-
-## Glossary
-
-| Term | Definition |
-|------|------------|
-| **Queue Position** | User's position in the booking queue (1 = next to be served) |
-| **Wait Time** | Estimated minutes until service starts |
-| **Active Booking** | Booking with status "pending" or "in-progress" |
-| **Verified Review** | Review linked to a completed booking |
-| **Geospatial Query** | MongoDB query using coordinates to find nearby locations |
-| **JWT** | JSON Web Token - Authentication token format |
-| **Soft Delete** | Marking record as deleted without removing from database |
-| **Idempotency** | Operation that produces same result regardless of how many times executed |
-| **Rate Limiting** | Restricting number of API requests per time window |
-| **TTL Index** | Time-to-live index that auto-deletes expired documents |
-
-***
-
-**End of Documentation**
-
-**Document Version:** 1.0  
-**Last Updated:** December 13, 2025  
-**Total Endpoints Documented:** 37  
-**Pages:** Complete API Reference
-
-This documentation is a living document and should be updated as the API evolves. For questions or clarifications, please contact the development team.
-
-❌ Firebase verification failed: Firebase ID token has incorrect "aud" (audience) claim. Expected "lynin-app" but got "trimzo-app". Make sure the ID token comes from the same Firebase project as the service account used to authenticate this SDK. See https://firebase.google.com/docs/auth/admin/verify-id-tokens for details on how to retrieve an ID token.
+100+ API ENDPOINTS
