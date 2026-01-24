@@ -4850,7 +4850,7 @@ Body:
 
 ## **15. SUPPORT & CONTACT**
 
-**Backend Maintained By:** Lynin Development Team  
+**Backend Maintained By:** Ruhban Abdullah
 **Support Email:** support@lynin.com  
 **Documentation Updated:** January 24, 2026
 
