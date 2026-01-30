@@ -1006,7 +1006,7 @@ exports.getSalonBookings = async (req, res) => {
         phone: booking.userId?.phone || 'N/A',
         email: booking.userId?.email || null,
       },
-      customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'),
+      customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Online Customer'),
       customerPhone: booking.userId?.phone || 'N/A',
       walkInToken: booking.walkInToken || null,
       assignedStaffId: booking.assignedStaffId?._id || booking.assignedStaffId || null,
