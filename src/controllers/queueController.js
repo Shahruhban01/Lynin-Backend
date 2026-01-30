@@ -1,46 +1,14 @@
 const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
-const { addWalkInCustomer } = require('../services/queueService');
+const {
+  addWalkInCustomer,
+  startService,
+} = require('../services/queueService');
 
 
-// ✅ Helper: Generate sequential 4-digit token starting from 0001
-// ✅ SAFER VERSION: Use findOneAndUpdate with atomic increment
-async function generateWalkInToken(salonId) {
-  const MAX_ATTEMPTS = 20;
 
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    // 1️⃣ Random letter
-    const letter = letters.charAt(
-      Math.floor(Math.random() * letters.length)
-    );
-
-    // 2️⃣ Random 2-digit number (00–99)
-    const number = Math.floor(Math.random() * 100)
-      .toString()
-      .padStart(2, '0');
-
-    const token = `${letter}${number}`;
-
-    // 3️⃣ Check if token is already active
-    const exists = await Booking.exists({
-      salonId,
-      walkInToken: token,
-      status: { $in: ['pending', 'in-progress'] },
-    });
-
-    // 4️⃣ If not exists → use it
-    if (!exists) {
-      console.log(`🎫 Generated unique token: ${token}`);
-      return token;
-    }
-  }
-
-  // If too many collisions
-  throw new Error('Unable to generate unique walk-in token. Try again.');
-}
 
 
 
@@ -238,29 +206,10 @@ exports.startService = async (req, res) => {
   try {
     const { salonId, bookingId } = req.params;
 
-    const booking = await Booking.findOne({ _id: bookingId, salonId });
+    // Call service
+    const booking = await startService(salonId, bookingId);
 
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found',
-      });
-    }
-
-    if (booking.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot start service - booking is ${booking.status}`,
-      });
-    }
-
-    booking.status = 'in-progress';
-    booking.startedAt = new Date();
-    await booking.save();
-
-    console.log(`▶️ Service started for booking: ${bookingId}`);
-
-    // Emit socket event
+    // Emit socket
     if (global.io) {
       global.io.to(`salon_${salonId}`).emit('service_started', {
         bookingId: booking._id,
@@ -282,15 +231,17 @@ exports.startService = async (req, res) => {
         startedAt: booking.startedAt,
       },
     });
+
   } catch (error) {
     console.error('❌ Start service error:', error);
-    res.status(500).json({
+
+    res.status(400).json({
       success: false,
-      message: 'Failed to start service',
-      error: error.message,
+      message: error.message,
     });
   }
 };
+
 
 // @desc Complete service
 // @route POST /api/queue/:salonId/complete/:bookingId
