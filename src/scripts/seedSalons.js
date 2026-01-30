@@ -200,7 +200,7 @@ const seedSalons = async () => {
         phone: '+919999999999',
         name: 'Salon Owner',
         firebaseUid: 'dummy-owner-uid',
-        email: 'owner@trimzo.com',
+        email: 'owner@lynin.com',
       });
     }
 

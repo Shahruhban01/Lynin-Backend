@@ -282,7 +282,7 @@ setInterval(async () => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0';
+const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
   console.log(`\n${'='.repeat(60)}`);
@@ -290,7 +290,7 @@ server.listen(PORT, HOST, () => {
   console.log(`${'='.repeat(60)}`);
   console.log(`📍 Server running on:`);
   console.log(`   - Local:   http://localhost:${PORT}`);
-  console.log(`   - Network: http://100.112.160.11:${PORT}`);
+  console.log(`   - Network: http://${HOST}:${PORT}`);
   console.log(`\n📱 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔥 Firebase Admin SDK: ✅ Initialized`);
   console.log(`🔌 Socket.io: ✅ Enabled`);

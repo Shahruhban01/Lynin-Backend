@@ -3,27 +3,27 @@ const AppInfo = require('../models/AppInfo');
 require('dotenv').config();
 
 const appInfoData = {
-  appName: 'Trimzo',
-  appDescription: 'Trimzo is a modern salon booking and management platform that connects customers with salons and helps salon owners manage their business efficiently.',
+  appName: 'Lynin',
+  appDescription: 'Lynin is a modern salon booking and management platform that connects customers with salons and helps salon owners manage their business efficiently.',
   appLogo: 'https://your-cdn.com/logo.png',
   
-  companyName: 'Trimzo Technologies',
+  companyName: 'Lynin Technologies',
   yearOfLaunch: 2026,
-  websiteUrl: 'https://trimzo.com',
+  websiteUrl: 'https://lynin.in',
   
-  privacyPolicyUrl: 'https://trimzo.com/privacy-policy',
-  termsAndConditionsUrl: 'https://trimzo.com/terms',
-  refundPolicyUrl: 'https://trimzo.com/refund-policy',
+  privacyPolicyUrl: 'https://lynin.in/privacy-policy',
+  termsAndConditionsUrl: 'https://lynin.in/terms',
+  refundPolicyUrl: 'https://lynin.in/refund-policy',
   
-  supportEmail: 'support@trimzo.com',
+  supportEmail: 'support@lynin.in',
   supportPhone: '+91-1234567890',
   
   socialMedia: {
-    facebook: 'https://facebook.com/trimzo',
-    instagram: 'https://instagram.com/trimzo',
-    twitter: 'https://twitter.com/trimzo',
-    linkedin: 'https://linkedin.com/company/trimzo',
-    youtube: 'https://youtube.com/@trimzo',
+    facebook: 'https://facebook.com/lynin',
+    instagram: 'https://instagram.com/lynin',
+    twitter: 'https://twitter.com/lynin',
+    linkedin: 'https://linkedin.com/company/lynin',
+    youtube: 'https://youtube.com/@lynin',
   },
   
   openSourceLicenses: [
