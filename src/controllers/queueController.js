@@ -1,6 +1,8 @@
 const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
+const { addWalkInCustomer } = require('../services/queueService');
+
 
 // ✅ Helper: Generate sequential 4-digit token starting from 0001
 // ✅ SAFER VERSION: Use findOneAndUpdate with atomic increment
@@ -66,7 +68,7 @@ exports.getQueueBySalon = async (req, res) => {
       queue: queue.map((booking) => {
         // ✅ Debug log
         console.log(`Booking ${booking._id}: walkInToken = ${booking.walkInToken}`);
-        
+
         return {
           _id: booking._id,
           customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'),
@@ -102,119 +104,15 @@ exports.getQueueBySalon = async (req, res) => {
 exports.addWalkInToQueue = async (req, res) => {
   try {
     const { salonId } = req.params;
-    const { name, phone, services } = req.body;
 
-    console.log('👤 Add walk-in request:');
-    console.log('   Salon:', salonId);
-    console.log('   Name:', name);
-    console.log('   Phone:', phone);
-    console.log('   Services:', services);
-
-    // Validation
-    if (!services || services.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one service is required',
-      });
-    }
-
-    const salon = await Salon.findById(salonId);
-
-    if (!salon || !salon.isActive) {
-      return res.status(404).json({
-        success: false,
-        message: 'Salon not found or inactive',
-      });
-    }
-
-    let userId = null;
-    let walkInToken = null;
-
-    // ✅ Check if phone is provided and valid
-    const hasValidPhone = phone && phone.trim().length >= 10;
-    const hasValidName = name && name.trim().length > 0;
-
-    if (hasValidPhone) {
-      // Create/find user if phone provided
-      let walkInUser = await User.findOne({ phone });
-      
-      if (!walkInUser) {
-        const tempFirebaseUid = `walkin_${phone}_${Date.now()}`;
-        
-        walkInUser = await User.create({
-          phone,
-          name: hasValidName ? name.trim() : null,
-          firebaseUid: tempFirebaseUid,
-          role: 'customer',
-          isActive: true,
-        });
-        
-        console.log(`✅ Created new user account for walk-in: ${phone}`);
-      } else {
-        console.log(`✅ Found existing user for phone: ${phone}`);
-        
-        if (hasValidName && !walkInUser.name) {
-          walkInUser.name = name.trim();
-          await walkInUser.save();
-          console.log(`✅ Updated user name: ${name}`);
-        }
-      }
-      
-      userId = walkInUser._id;
-    } else {
-      // ✅ Generate token for anonymous walk-ins (no phone/name)
-      walkInToken = await generateWalkInToken(salonId);
-      console.log(`🎫 Generated walk-in token: ${walkInToken}`);
-    }
-
-    // Calculate total price and duration
-    let totalPrice = 0;
-    let totalDuration = 0;
-
-    services.forEach((service) => {
-      totalPrice += service.price;
-      totalDuration += service.duration;
-    });
-
-    // Get current queue size to determine position
-    const currentQueueSize = await Booking.countDocuments({
+    const booking = await addWalkInCustomer({
       salonId,
-      status: { $in: ['pending', 'in-progress'] },
+      name: req.body.name,
+      phone: req.body.phone,
+      services: req.body.services,
     });
 
-    // Create booking
-    const booking = await Booking.create({
-      userId: userId,
-      salonId,
-      bookingType: 'immediate',
-      services,
-      totalPrice,
-      totalDuration,
-      queuePosition: currentQueueSize + 1,
-      status: 'pending',
-      paymentMethod: 'cash',
-      arrived: true,
-      arrivedAt: new Date(),
-      walkInToken: walkInToken, // ✅ NEW: Store token
-      notes: !userId && hasValidName ? `Walk-in: ${name}` : '',
-    });
-
-    // Populate userId for response
-    await booking.populate('userId', 'name phone');
-
-    console.log(`✅ Walk-in added to queue: Position ${booking.queuePosition} (auto-arrived)`);
-    if (walkInToken) {
-      console.log(`🎫 Token: ${walkInToken}`);
-    }
-
-    // Update user's total bookings if userId exists
-    if (userId) {
-      await User.findByIdAndUpdate(userId, {
-        $inc: { totalBookings: 1 },
-      });
-    }
-
-    // Emit socket event
+    // Emit socket
     if (global.io) {
       global.io.to(`salon_${salonId}`).emit('queue_updated', {
         action: 'walk_in_added',
@@ -222,50 +120,36 @@ exports.addWalkInToQueue = async (req, res) => {
       });
     }
 
-    // Emit wait time update
+    // Wait time
     const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
     await emitWaitTimeUpdate(salonId);
 
-    // ✅ Format response with customer details
-    const customerDisplay = booking.userId?.name 
-      ? booking.userId.name
-      : (booking.walkInToken ? `Token #${booking.walkInToken}` : (name || 'Walk-in Customer'));
-
-    const response = {
-      _id: booking._id,
-      userId: booking.userId?._id || null,
-      customerName: customerDisplay,
-      customerPhone: booking.userId?.phone || phone || 'N/A',
-      walkInToken: booking.walkInToken || null, // ✅ NEW
-      services: booking.services,
-      totalPrice: booking.totalPrice,
-      totalDuration: booking.totalDuration,
-      queuePosition: booking.queuePosition,
-      status: booking.status,
-      arrived: booking.arrived,
-      arrivedAt: booking.arrivedAt,
-      joinedAt: booking.createdAt,
-      bookingType: booking.bookingType,
-    };
+    const customerName = booking.userId?.name
+      || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in');
 
     res.status(201).json({
       success: true,
-      message: userId 
-        ? 'Walk-in customer added with account created/linked'
-        : walkInToken
-          ? `Walk-in added with token #${walkInToken}`
-          : 'Walk-in added to queue',
-      booking: response,
+      message: 'Walk-in added successfully',
+      booking: {
+        _id: booking._id,
+        customerName,
+        customerPhone: booking.userId?.phone || 'N/A',
+        walkInToken: booking.walkInToken,
+        queuePosition: booking.queuePosition,
+        status: booking.status,
+      },
     });
+
   } catch (error) {
     console.error('❌ Add walk-in error:', error);
-    res.status(500).json({
+
+    res.status(400).json({
       success: false,
-      message: 'Failed to add walk-in',
-      error: error.message,
+      message: error.message,
     });
   }
 };
+
 
 // @desc    Mark customer as arrived
 // @route   POST /api/queue/:salonId/arrived
@@ -438,47 +322,47 @@ exports.completeService = async (req, res) => {
     booking.status = 'completed';
     booking.completedAt = new Date();
     booking.loyaltyPointsEarned = pointsEarned;
-    
+
     // AUTO-MARK PAYMENT AS PAID
     booking.paymentStatus = 'paid';
     booking.paidAmount = booking.totalPrice;
     booking.paymentDate = new Date();
-    
+
     await booking.save();
 
     // ✅ Award loyalty points to user (only if user exists)
     if (booking.userId) {
       const User = require('../models/User');
-      
+
       console.log('🔍 DEBUG: Before update:');
       console.log('   User ID:', booking.userId);
       console.log('   Points to award:', pointsEarned);
-      
+
       // ✅ First, get current user state
       const userBefore = await User.findById(booking.userId).select('name loyaltyPoints totalBookings');
       console.log('   Current loyalty points:', userBefore?.loyaltyPoints);
       console.log('   Current total bookings:', userBefore?.totalBookings);
-      
+
       // ✅ UPDATED: More explicit update with logging
       const updatedUser = await User.findByIdAndUpdate(
         booking.userId,
         {
-          $inc: { 
+          $inc: {
             totalBookings: 1,
             loyaltyPoints: pointsEarned
           },
         },
-        { 
+        {
           new: true,  // ✅ Return updated document
           runValidators: true  // ✅ Run schema validators
         }
       ).select('name loyaltyPoints totalBookings');
-      
+
       console.log('🔍 DEBUG: After update:');
       console.log('   Updated user:', updatedUser);
       console.log('   New loyalty points:', updatedUser?.loyaltyPoints);
       console.log('   New total bookings:', updatedUser?.totalBookings);
-      
+
       if (updatedUser) {
         console.log(`✅ Service completed. ${pointsEarned} loyalty points awarded to user ${booking.userId}`);
         console.log(`💰 Payment auto-marked as paid: ₹${booking.totalPrice}`);
@@ -891,7 +775,7 @@ exports.startPriorityService = async (req, res) => {
 
     // ✅ VALIDATION 3: Get salon and check priority limit
     const salon = await Salon.findById(salonId);
-    
+
     if (!salon) {
       return res.status(404).json({
         success: false,
@@ -980,13 +864,13 @@ exports.startPriorityService = async (req, res) => {
 
     // ✅ EXECUTE: Start service as priority
     const originalPosition = booking.queuePosition;
-    
+
     booking.status = 'in-progress';
     booking.startedAt = new Date();
-    booking.notes = booking.notes 
-      ? `${booking.notes} | Priority: ${reason}` 
+    booking.notes = booking.notes
+      ? `${booking.notes} | Priority: ${reason}`
       : `Priority: ${reason}`;
-    
+
     await booking.save();
 
     // ✅ INCREMENT: Priority usage count
@@ -996,7 +880,7 @@ exports.startPriorityService = async (req, res) => {
     // ✅ AUDIT LOG: Record priority action (IMMUTABLE)
     const PriorityLog = require('../models/PriorityLog');
     const Staff = require('../models/Staff');
-    
+
     let assignedStaffName = null;
     if (assignedStaffId) {
       const staff = await Staff.findById(assignedStaffId);
