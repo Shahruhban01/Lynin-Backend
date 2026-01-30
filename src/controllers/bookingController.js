@@ -1033,6 +1033,8 @@ exports.getSalonBookings = async (req, res) => {
       skippedAt: booking.skippedAt || null,
       originalPosition: booking.originalPosition || null,
       skipReason: booking.skipReason || null,
+      // serviceType: booking.serviceType || null,
+      serviceName: booking.services.map(service => service.name).join(', '),
     }));
 
     res.status(200).json({
