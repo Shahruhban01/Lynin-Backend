@@ -999,6 +999,7 @@ exports.getSalonBookings = async (req, res) => {
 
     const formattedBookings = bookings.map((booking) => ({
       _id: booking._id,
+      userId: booking.userId?._id || null,
       customer: {
         _id: booking.userId?._id || null,
         name: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'),
