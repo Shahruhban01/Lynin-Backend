@@ -1,7 +1,10 @@
 const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
-const { addWalkInCustomer } = require('../services/queueService');
+const {
+  addWalkInCustomer,
+  startService,
+} = require('../services/queueService');
 
 
 
@@ -202,29 +205,10 @@ exports.startService = async (req, res) => {
   try {
     const { salonId, bookingId } = req.params;
 
-    const booking = await Booking.findOne({ _id: bookingId, salonId });
+    // Call service
+    const booking = await startService(salonId, bookingId);
 
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found',
-      });
-    }
-
-    if (booking.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot start service - booking is ${booking.status}`,
-      });
-    }
-
-    booking.status = 'in-progress';
-    booking.startedAt = new Date();
-    await booking.save();
-
-    console.log(`▶️ Service started for booking: ${bookingId}`);
-
-    // Emit socket event
+    // Emit socket
     if (global.io) {
       global.io.to(`salon_${salonId}`).emit('service_started', {
         bookingId: booking._id,
@@ -246,15 +230,17 @@ exports.startService = async (req, res) => {
         startedAt: booking.startedAt,
       },
     });
+
   } catch (error) {
     console.error('❌ Start service error:', error);
-    res.status(500).json({
+
+    res.status(400).json({
       success: false,
-      message: 'Failed to start service',
-      error: error.message,
+      message: error.message,
     });
   }
 };
+
 
 // @desc Complete service
 // @route POST /api/queue/:salonId/complete/:bookingId
