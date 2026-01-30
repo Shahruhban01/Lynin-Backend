@@ -5,35 +5,41 @@ const User = require('../models/User');
 // ✅ Helper: Generate sequential 4-digit token starting from 0001
 // ✅ SAFER VERSION: Use findOneAndUpdate with atomic increment
 async function generateWalkInToken(salonId) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const MAX_ATTEMPTS = 20;
 
-  // Find the highest token number used today for this salon
-  const lastBooking = await Booking.findOne({
-    salonId,
-    walkInToken: { $exists: true, $ne: null },
-    createdAt: { $gte: today, $lt: tomorrow },
-  })
-    .sort({ walkInToken: -1 })
-    .select('walkInToken')
-    .lean();
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  let nextTokenNumber = 1;
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    // 1️⃣ Random letter
+    const letter = letters.charAt(
+      Math.floor(Math.random() * letters.length)
+    );
 
-  if (lastBooking && lastBooking.walkInToken) {
-    const lastTokenNumber = parseInt(lastBooking.walkInToken, 10);
-    if (!isNaN(lastTokenNumber)) {
-      nextTokenNumber = lastTokenNumber + 1;
+    // 2️⃣ Random 2-digit number (00–99)
+    const number = Math.floor(Math.random() * 100)
+      .toString()
+      .padStart(2, '0');
+
+    const token = `${letter}${number}`;
+
+    // 3️⃣ Check if token is already active
+    const exists = await Booking.exists({
+      salonId,
+      walkInToken: token,
+      status: { $in: ['pending', 'in-progress'] },
+    });
+
+    // 4️⃣ If not exists → use it
+    if (!exists) {
+      console.log(`🎫 Generated unique token: ${token}`);
+      return token;
     }
   }
 
-  const token = String(nextTokenNumber).padStart(4, '0');
-  console.log(`🎫 Generated walk-in token: ${token} (Next in sequence for today)`);
-
-  return token;
+  // If too many collisions
+  throw new Error('Unable to generate unique walk-in token. Try again.');
 }
+
 
 
 // @desc    Get live queue for salon
