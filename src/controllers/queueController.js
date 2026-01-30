@@ -4,43 +4,7 @@ const User = require('../models/User');
 const { addWalkInCustomer } = require('../services/queueService');
 
 
-// ✅ Helper: Generate sequential 4-digit token starting from 0001
-// ✅ SAFER VERSION: Use findOneAndUpdate with atomic increment
-async function generateWalkInToken(salonId) {
-  const MAX_ATTEMPTS = 20;
 
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    // 1️⃣ Random letter
-    const letter = letters.charAt(
-      Math.floor(Math.random() * letters.length)
-    );
-
-    // 2️⃣ Random 2-digit number (00–99)
-    const number = Math.floor(Math.random() * 100)
-      .toString()
-      .padStart(2, '0');
-
-    const token = `${letter}${number}`;
-
-    // 3️⃣ Check if token is already active
-    const exists = await Booking.exists({
-      salonId,
-      walkInToken: token,
-      status: { $in: ['pending', 'in-progress'] },
-    });
-
-    // 4️⃣ If not exists → use it
-    if (!exists) {
-      console.log(`🎫 Generated unique token: ${token}`);
-      return token;
-    }
-  }
-
-  // If too many collisions
-  throw new Error('Unable to generate unique walk-in token. Try again.');
-}
 
 
 
