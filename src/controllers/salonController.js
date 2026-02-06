@@ -1,8 +1,10 @@
+const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
+const { syncStaffCounts } = require('../utils/staffSync');
 const WaitTimeService = require('../services/waitTimeService');
 const { attachWaitTimesToSalons } = require('../utils/waitTimeHelpers');
-const Booking = require('../models/Booking');
 const NotificationService = require('../services/notificationService');
+
 
 // ✅ NEW: Close salon with reason and queue check
 // @desc    Close salon with reason (checks queue status)
@@ -889,6 +891,8 @@ exports.toggleSalonStatus = async (req, res) => {
 // @desc    Enable/Disable staff management system
 // @route   PUT /api/salons/:id/toggle-staff-system
 // @access  Private (Owner)
+// ✅ NEW: Toggle staff system (Auto-sync via staffSync)
+// ✅ NEW: Toggle staff system (Auto-sync via staffSync + 1:1 fallback)
 exports.toggleStaffSystem = async (req, res) => {
   try {
     const salon = await Salon.findById(req.params.id);
@@ -908,21 +912,57 @@ exports.toggleStaffSystem = async (req, res) => {
       });
     }
 
-    // Toggle the system
+    // Toggle system
     salon.staffSystemEnabled = !salon.staffSystemEnabled;
+
+    let staffStats = {
+      total: salon.totalBarbers,
+      active: salon.activeBarbers,
+    };
+
+    // ✅ If ENABLED → sync from Staff DB
+    if (salon.staffSystemEnabled) {
+      staffStats = await syncStaffCounts(salon._id);
+
+      // Safety fallback
+      salon.totalBarbers = staffStats.total || 1;
+      salon.activeBarbers = staffStats.active || 1;
+    }
+
+    // ✅ If DISABLED → force 1:1 manual mode
+    if (!salon.staffSystemEnabled) {
+      salon.totalBarbers = 1;
+      salon.activeBarbers = 1;
+
+      staffStats = {
+        total: 1,
+        active: 1,
+      };
+    }
+
     await salon.save();
 
+    // ✅ Recalculate wait time
+    const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+    await emitWaitTimeUpdate(salon._id);
+
     console.log(
-      `✅ Staff system ${salon.staffSystemEnabled ? 'ENABLED' : 'DISABLED'} for salon: ${salon.name}`
+      `✅ Staff system ${salon.staffSystemEnabled ? 'ENABLED' : 'DISABLED'} for ${salon.name}`
     );
+    console.log(`👥 Total: ${staffStats.total}, Active: ${staffStats.active}`);
 
     res.status(200).json({
       success: true,
       message: `Staff system ${salon.staffSystemEnabled ? 'enabled' : 'disabled'}`,
       staffSystemEnabled: salon.staffSystemEnabled,
+      staffStats: {
+        totalStaff: staffStats.total,
+        activeStaff: staffStats.active,
+      },
     });
   } catch (error) {
     console.error('❌ Toggle staff system error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to toggle staff system',
@@ -930,6 +970,8 @@ exports.toggleStaffSystem = async (req, res) => {
     });
   }
 };
+
+
 
 // ✅ NEW: Update staff system status
 // @desc    Set staff system enabled/disabled state
