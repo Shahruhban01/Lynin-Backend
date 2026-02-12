@@ -7,7 +7,7 @@ const {
   markNoShow,
   markScheduledArrived,
   debugScheduledBookings,
-  getTommorowScheduledBookings,
+  gettomorrowScheduledBookings,
 } = require('../controllers/scheduledBookingController');
 
 // In your scheduledBookingRoutes.js or wherever your routes are
@@ -26,13 +26,13 @@ router.get(
   getTodayScheduledBookings
 );
 
-// Get tommorow's scheduled bookings for salon
+// Get tomorrow's scheduled bookings for salon
 router.get(
-  '/:salonId/tommorow',
+  '/:salonId/tomorrow',
   protect,
   requireRole(['owner', 'manager', 'staff']),
   requireSalonAccess('salonId'),
-  getTommorowScheduledBookings
+  gettomorrowScheduledBookings
 );
 
 // Mark as no-show

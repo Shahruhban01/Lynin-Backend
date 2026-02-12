@@ -77,9 +77,9 @@ exports.getTodayScheduledBookings = async (req, res) => {
 
 
 // @desc    Get tomorrow's scheduled bookings for salon
-// @route   GET /api/scheduled-bookings/:salonId/tommorow
+// @route   GET /api/scheduled-bookings/:salonId/tomorrow
 // @access  Private (Owner/Manager/Staff)
-exports.getTommorowScheduledBookings = async (req, res) => {
+exports.gettomorrowScheduledBookings = async (req, res) => {
   try {
     const { salonId } = req.params;
 
@@ -399,7 +399,7 @@ module.exports = {
   markNoShow: exports.markNoShow,
   markScheduledArrived: exports.markScheduledArrived,
   debugScheduledBookings: exports.debugScheduledBookings,
-  getTommorowScheduledBookings: exports.getTommorowScheduledBookings,
+  gettomorrowScheduledBookings: exports.gettomorrowScheduledBookings,
 };
 
 
