@@ -2,6 +2,81 @@ const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
 
+// 🆕 NEW: Get both today's and tomorrow's scheduled bookings
+// @desc    Get upcoming (today + tomorrow) scheduled bookings for salon
+// @route   GET /api/scheduled-bookings/:salonId/upcoming
+// @access  Private (Owner/Manager/Staff)
+exports.getUpcomingScheduledBookings = async (req, res) => {
+  try {
+    const { salonId } = req.params;
+
+    const now = new Date();
+
+    // Start of today
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+
+    // End of tomorrow (start of day after tomorrow)
+    const endOfTomorrow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 2
+    );
+
+    console.log('📅 Getting upcoming bookings (today + tomorrow) for:', {
+      salonId,
+      startOfDay,
+      endOfTomorrow,
+      serverTime: now,
+    });
+
+    const upcomingBookings = await Booking.find({
+      salonId,
+      bookingType: 'scheduled',
+      status: { $in: ['pending', 'in-progress'] },
+      arrived: false,
+      scheduledDate: {
+        $gte: startOfDay,
+        $lt: endOfTomorrow,
+      },
+    })
+      .populate('userId', 'name phone')
+      .sort({ scheduledDate: 1, scheduledTime: 1 });
+
+    console.log(`✅ ${upcomingBookings.length} upcoming bookings found (today + tomorrow)`);
+
+    res.status(200).json({
+      success: true,
+      count: upcomingBookings.length,
+      bookings: upcomingBookings.map(booking => ({
+        _id: booking._id,
+        customerName: booking.userId?.name || 'Unknown',
+        customerPhone: booking.userId?.phone || 'N/A',
+        scheduledTime: booking.scheduledTime,
+        scheduledDate: booking.scheduledDate,
+        services: booking.services,
+        totalPrice: booking.totalPrice,
+        totalDuration: booking.totalDuration,
+        status: booking.status,
+        arrived: booking.arrived || false,
+        arrivedAt: booking.arrivedAt,
+        queuePosition: booking.queuePosition,
+      })),
+    });
+
+  } catch (error) {
+    console.error('❌ Get upcoming scheduled bookings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch upcoming scheduled bookings',
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Get today's scheduled bookings for salon
 // @route   GET /api/scheduled-bookings/:salonId/today
 // @access  Private (Owner/Manager/Staff)
@@ -74,8 +149,6 @@ exports.getTodayScheduledBookings = async (req, res) => {
   }
 };
 
-
-
 // @desc    Get tomorrow's scheduled bookings for salon
 // @route   GET /api/scheduled-bookings/:salonId/tomorrow
 // @access  Private (Owner/Manager/Staff)
@@ -147,7 +220,6 @@ exports.gettomorrowScheduledBookings = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Mark scheduled booking as no-show
 // @route   PATCH /api/scheduled-bookings/:bookingId/no-show
@@ -246,24 +318,16 @@ exports.markScheduledArrived = async (req, res) => {
       });
     }
 
-    // ✅ FIXED: Count ALL active bookings (not just arrived)
-    // This ensures position is never 0
+    // Count ALL active bookings (not just arrived)
     const currentQueueSize = await Booking.countDocuments({
       salonId: booking.salonId._id,
       status: { $in: ['pending', 'in-progress'] },
     });
 
-    //     booking.arrived = true;
-    // booking.arrivedAt = new Date();
-    // booking.joinedAt = new Date();
-    // booking.queuePosition = calculatedPosition;
-    // booking.status = 'pending';
-
-
     // Mark as arrived and assign queue position
     booking.arrived = true;
     booking.arrivedAt = new Date();
-    booking.queuePosition = currentQueueSize + 1; // ✅ Always at least 1
+    booking.queuePosition = currentQueueSize + 1;
 
     await booking.save();
 
@@ -312,9 +376,7 @@ exports.markScheduledArrived = async (req, res) => {
   }
 };
 
-
-
-// ✅ NEW: Helper function to reorder queue positions
+// Helper function to reorder queue positions
 async function _reorderQueuePositions(salonId) {
   try {
     const activeBookings = await Booking.find({
@@ -335,12 +397,11 @@ async function _reorderQueuePositions(salonId) {
   }
 }
 
-// Add this to your scheduledBookingController.js (temporary for debugging)
+// Debug endpoint
 exports.debugScheduledBookings = async (req, res) => {
   try {
     const { salonId } = req.params;
 
-    // Get ALL bookings for this salon (no date filter)
     const allBookings = await Booking.find({
       salonId,
       bookingType: 'scheduled',
@@ -360,7 +421,6 @@ exports.debugScheduledBookings = async (req, res) => {
       console.log('---');
     });
 
-    // Check what "today" means on server
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);
@@ -393,13 +453,11 @@ exports.debugScheduledBookings = async (req, res) => {
   }
 };
 
-
 module.exports = {
   getTodayScheduledBookings: exports.getTodayScheduledBookings,
   markNoShow: exports.markNoShow,
   markScheduledArrived: exports.markScheduledArrived,
   debugScheduledBookings: exports.debugScheduledBookings,
   gettomorrowScheduledBookings: exports.gettomorrowScheduledBookings,
+  getUpcomingScheduledBookings: exports.getUpcomingScheduledBookings, // 🆕 NEW
 };
-
-

@@ -8,14 +8,23 @@ const {
   markScheduledArrived,
   debugScheduledBookings,
   gettomorrowScheduledBookings,
+  getUpcomingScheduledBookings, // 🆕 NEW
 } = require('../controllers/scheduledBookingController');
 
-// In your scheduledBookingRoutes.js or wherever your routes are
+// Debug route
 router.get('/scheduled-bookings/:salonId/debug', 
   protect, 
   debugScheduledBookings
 );
 
+// 🆕 NEW: Get both today's and tomorrow's bookings in one call
+router.get(
+  '/:salonId/upcoming',
+  protect,
+  requireRole(['owner', 'manager', 'staff']),
+  requireSalonAccess('salonId'),
+  getUpcomingScheduledBookings
+);
 
 // Get today's scheduled bookings for salon
 router.get(
