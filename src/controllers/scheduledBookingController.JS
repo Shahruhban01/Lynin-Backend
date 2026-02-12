@@ -9,40 +9,39 @@ exports.getTodayScheduledBookings = async (req, res) => {
   try {
     const { salonId } = req.params;
 
-    // Get current date in UTC (start of day)
     const now = new Date();
 
-    // Method 1: Just use the calendar date (ignore time completely)
-    const todayString = now.toISOString().split('T')[0]; // "2026-01-23"
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+
+    const endOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1
+    );
 
     console.log('📅 Getting scheduled bookings for:', {
       salonId,
-      todayString,
-      serverTime: now.toISOString(),
+      startOfDay,
+      endOfDay,
+      serverTime: now,
     });
 
-    // Find all scheduled bookings for this salon
-    const bookings = await Booking.find({
+    const todayBookings = await Booking.find({
       salonId,
       bookingType: 'scheduled',
       status: { $in: ['pending', 'in-progress'] },
+      arrived: false,
+      scheduledDate: {
+        $gte: startOfDay,
+        $lt: endOfDay,
+      },
     })
       .populate('userId', 'name phone')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
-
-    console.log(`📦 Found ${bookings.length} total scheduled bookings`);
-
-    // Filter bookings manually by checking if scheduledDate matches today
-    const todayBookings = bookings.filter(booking => {
-      if (!booking.scheduledDate) return false;
-
-      const bookingDateString = new Date(booking.scheduledDate).toISOString().split('T')[0];
-      const isToday = bookingDateString === todayString;
-
-      console.log(`  Booking ${booking._id}: ${bookingDateString} === ${todayString}? ${isToday} (arrived: ${booking.arrived})`);
-
-      return isToday && !booking.arrived;
-    });
 
     console.log(`✅ ${todayBookings.length} bookings for today (not yet arrived)`);
 
@@ -64,6 +63,7 @@ exports.getTodayScheduledBookings = async (req, res) => {
         queuePosition: booking.queuePosition,
       })),
     });
+
   } catch (error) {
     console.error('❌ Get scheduled bookings error:', error);
     res.status(500).json({
@@ -75,7 +75,8 @@ exports.getTodayScheduledBookings = async (req, res) => {
 };
 
 
-// @desc    Get tommorow's scheduled bookings for salon
+
+// @desc    Get tomorrow's scheduled bookings for salon
 // @route   GET /api/scheduled-bookings/:salonId/tommorow
 // @access  Private (Owner/Manager/Staff)
 exports.getTommorowScheduledBookings = async (req, res) => {
@@ -83,31 +84,45 @@ exports.getTommorowScheduledBookings = async (req, res) => {
     const { salonId } = req.params;
 
     const now = new Date();
-    const tommorowDate = new Date(now);
-    tommorowDate.setDate(tommorowDate.getDate() + 1);
-    const tommorowString = tommorowDate.toISOString().split('T')[0];
 
-    const bookings = await Booking.find({
+    const startOfTomorrow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1
+    );
+
+    const endOfTomorrow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 2
+    );
+
+    console.log('📅 Getting tomorrow scheduled bookings for:', {
+      salonId,
+      startOfTomorrow,
+      endOfTomorrow,
+      serverTime: now,
+    });
+
+    const tomorrowBookings = await Booking.find({
       salonId,
       bookingType: 'scheduled',
-      status: 'pending',
+      status: { $in: ['pending', 'in-progress'] },
+      arrived: false,
+      scheduledDate: {
+        $gte: startOfTomorrow,
+        $lt: endOfTomorrow,
+      },
     })
       .populate('userId', 'name phone')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
-    const tommorowBookings = bookings.filter(booking => {
-      if (!booking.scheduledDate) return false;
-
-      const bookingDateString =
-        new Date(booking.scheduledDate).toISOString().split('T')[0];
-
-      return bookingDateString === tommorowString && !booking.arrived;
-    });
+    console.log(`✅ ${tomorrowBookings.length} bookings for tomorrow (not yet arrived)`);
 
     res.status(200).json({
       success: true,
-      count: tommorowBookings.length,
-      bookings: tommorowBookings.map(booking => ({
+      count: tomorrowBookings.length,
+      bookings: tomorrowBookings.map(booking => ({
         _id: booking._id,
         customerName: booking.userId?.name || 'Unknown',
         customerPhone: booking.userId?.phone || 'N/A',
@@ -122,6 +137,7 @@ exports.getTommorowScheduledBookings = async (req, res) => {
         queuePosition: booking.queuePosition,
       })),
     });
+
   } catch (error) {
     console.error('❌ Get tomorrow scheduled bookings error:', error);
     res.status(500).json({
@@ -131,7 +147,6 @@ exports.getTommorowScheduledBookings = async (req, res) => {
     });
   }
 };
-
 
 
 // @desc    Mark scheduled booking as no-show

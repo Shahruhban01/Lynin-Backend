@@ -19,10 +19,16 @@ class WaitTimeService {
   static async calculateWaitTime(salonId, userId = null, salon = null) {
     try {
       // Get all pending and in-progress bookings, sorted by queue position
+      // const queueEntries = await Booking.find({
+      //   salonId: salonId,
+      //   status: { $in: ['pending', 'in-progress'] }
+      // }).sort({ queuePosition: 1 });
       const queueEntries = await Booking.find({
         salonId: salonId,
-        status: { $in: ['pending', 'in-progress'] }
+        status: { $in: ['pending', 'in-progress'] },
+        bookingType: { $ne: 'scheduled' }  // ❗ exclude scheduled bookings
       }).sort({ queuePosition: 1 });
+
 
       const queueLength = queueEntries.length;
 
@@ -44,8 +50,8 @@ class WaitTimeService {
 
       // Check if user is already in queue
       if (userId) {
-        userIndex = queueEntries.findIndex(entry => 
-          entry.userId.toString() === userId.toString() && 
+        userIndex = queueEntries.findIndex(entry =>
+          entry.userId.toString() === userId.toString() &&
           entry.status === 'pending'
         );
         if (userIndex !== -1) {
@@ -58,13 +64,13 @@ class WaitTimeService {
       // ========================================
       if (userEntry) {
         console.log(`📊 CASE 1: User ${userId} is in queue at position ${userEntry.queuePosition}`);
-        
+
         // Calculate wait time = sum of durations of ALL entries BEFORE user
         // EXCLUDES: User's own service time + everyone after them
-        
+
         for (let i = 0; i < userIndex; i++) {
           const entry = queueEntries[i];
-          
+
           if (entry.status === 'in-progress') {
             // For in-progress service, calculate REMAINING time
             const elapsedMinutes = Math.floor(
@@ -98,7 +104,7 @@ class WaitTimeService {
       // CASE 2: User has NOT joined the queue
       // ========================================
       console.log(`📊 CASE 2: User ${userId || 'anonymous'} not in queue - calculating total wait`);
-      
+
       // Calculate total wait time if they join RIGHT NOW
       for (const entry of queueEntries) {
         if (entry.status === 'in-progress') {
@@ -183,10 +189,10 @@ class WaitTimeService {
     if (minutes === 0) return 'No wait';
     if (minutes <= 5) return '~0-5 min';
     if (minutes < 60) return `~${minutes} min wait`;
-    
+
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    
+
     if (mins === 0) return `~${hours}h wait`;
     return `~${hours}h ${mins}m wait`;
   }
