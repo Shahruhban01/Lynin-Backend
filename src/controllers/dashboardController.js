@@ -131,7 +131,34 @@ exports.getDashboardStats = async (req, res) => {
       peakHoursFormatted = `${formatHour(peakStart)} – ${formatHour(peakEnd)}`;
     }
 
-    // Other stats for complex dashboard
+    // ✅ NEW: Weekly traffic data (last 7 days)
+    const weeklyTraffic = {};
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const nextDate = new Date(date);
+      nextDate.setDate(nextDate.getDate() + 1);
+      
+      const count = await Booking.countDocuments({
+        salonId,
+        status: 'completed',
+        completedAt: { $gte: date, $lt: nextDate },
+      });
+      
+      const dayName = dayNames[date.getDay()];
+      weeklyTraffic[dayName] = count;
+    }
+
+    // Normalize weekly traffic to 0-1 scale for chart
+    const maxTraffic = Math.max(...Object.values(weeklyTraffic), 1);
+    const normalizedWeeklyTraffic = {};
+    Object.keys(weeklyTraffic).forEach(day => {
+      normalizedWeeklyTraffic[day] = weeklyTraffic[day] / maxTraffic;
+    });
+
+    // Other stats
     const inQueue = await Booking.countDocuments({
       salonId,
       status: 'pending',
@@ -152,7 +179,7 @@ exports.getDashboardStats = async (req, res) => {
     const walkInsToday = await Booking.countDocuments({
       salonId,
       joinedAt: { $gte: today, $lt: tomorrow },
-      $or: [{ userId: null }, { 'services.0': { $exists: true } }]
+      bookingType: 'immediate',
     });
 
     // Scheduled bookings
@@ -219,34 +246,41 @@ exports.getDashboardStats = async (req, res) => {
     res.status(200).json({
       success: true,
       
-      // NEW FIELDS for simplified dashboard
+      // Dashboard metrics
+      customersServed: customersServedToday,
       customersServedYesterday: customersServedYesterday,
       percentageChange: percentageChange,
       waitAccuracy: waitAccuracyPercentage,
       noShowRate: noShowRate,
       peakHours: peakHoursFormatted,
       
-      // EXISTING FIELDS for complex dashboard
+      // Queue stats
       inQueue,
       inService,
-      activeBarbers: salon.activeBarbers || salon.totalBarbers || 0,
+      activeBarbers: salon.activeBarbers || salon.totalBarbers || 1,
       avgWait,
-      customersServed: customersServedToday,
+      
+      // Service stats
       completedServices: totalServicesToday,
       walkInsToday,
-      peakHour: peakHoursFormatted,
+      
+      // Scheduled bookings
+      scheduledToday,
+      scheduledPending,
+      scheduledArrived,
+      scheduledNoShow,
+      
+      // Salon info
       isOpen: salon.isOpen || false,
       salonName: salon.name,
       address: fullAddress,
       city: locationCity,
       state: locationState,
-      scheduledToday,
-      scheduledPending,
-      scheduledArrived,
-      scheduledNoShow,
       avgServiceTime: salon.avgServiceTime || 30,
-      queueTrend: inQueue > 5 ? `+${inQueue - 5}` : null,
-      todayRevenue: null,
+      
+      // ✅ NEW: Weekly traffic data
+      weeklyTraffic: normalizedWeeklyTraffic,
+      weeklyTrafficRaw: weeklyTraffic, // Include raw counts for reference
     });
   } catch (error) {
     console.error('❌ Dashboard stats error:', error);

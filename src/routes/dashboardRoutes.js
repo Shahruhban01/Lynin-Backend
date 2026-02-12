@@ -13,4 +13,9 @@ router.get(
   getDashboardStats
 );
 
+// @route   GET /api/dashboard/:salonId
+// @desc    Get dashboard statistics for a salon
+// @access  Private (Owner/Manager)
+// router.get('/:salonId', protect, dashboardController.getDashboardStats);
+
 module.exports = router;
