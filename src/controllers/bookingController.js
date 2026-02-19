@@ -268,6 +268,50 @@ exports.joinQueue = async (req, res) => {
   }
 };
 
+// bookingController.js (or routes/bookings.js)
+
+// @desc    Update services on an existing booking (walk-in service selection)
+// @route   PUT /api/bookings/:bookingId/services
+// @access  Private (Owner/Manager/Staff)
+exports.updateBookingServices = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { services, totalPrice, totalDuration } = req.body;
+
+    if (!services || !Array.isArray(services) || services.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one service is required',
+      });
+    }
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    booking.services = services;
+    booking.totalPrice = totalPrice;
+    booking.totalDuration = totalDuration;
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Services updated',
+      booking: {
+        _id: booking._id,
+        services: booking.services,
+        totalPrice: booking.totalPrice,
+        totalDuration: booking.totalDuration,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Update booking services error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
 // @desc    Schedule booking for later
 // @route   POST /api/bookings/schedule
 // @access  Private
@@ -1006,9 +1050,14 @@ exports.getSalonBookings = async (req, res) => {
         phone: booking.userId?.phone || 'N/A',
         email: booking.userId?.email || null,
       },
-      customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Online Customer'),
+      // customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Online Customer'),
+      customerName:
+        booking.userId?.name ||
+        booking.walkInName ||                              // ✅ ADD
+        (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'),
       customerPhone: booking.userId?.phone || 'N/A',
       walkInToken: booking.walkInToken || null,
+      walkInName: booking.walkInName || null,
       assignedStaffId: booking.assignedStaffId?._id || booking.assignedStaffId || null,
       assignedStaffName: booking.assignedStaffId?.name || null,
       services: booking.services,
@@ -1344,6 +1393,7 @@ exports.getStaffBookings = async (req, res) => {
 
 module.exports = {
   joinQueue: exports.joinQueue,
+  updateBookingServices: exports.updateBookingServices, // ✅ ADD THIS
   getMyBookings: exports.getMyBookings,
   getBookingById: exports.getBookingById,
   cancelBooking: exports.cancelBooking,

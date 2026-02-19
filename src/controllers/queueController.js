@@ -33,26 +33,40 @@ exports.getQueueBySalon = async (req, res) => {
     res.status(200).json({
       success: true,
       count: queue.length,
-      queue: queue.map((booking) => {
-        // ✅ Debug log
-        console.log(`Booking ${booking._id}: walkInToken = ${booking.walkInToken}`);
+      queue: queue.map((booking) => ({
+        _id: booking._id,
 
-        return {
-          _id: booking._id,
-          customerName: booking.userId?.name || (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'),
-          customerPhone: booking.userId?.phone || 'N/A',
-          walkInToken: booking.walkInToken || null, // ✅ Make sure this is here
-          services: booking.services,
-          totalPrice: booking.totalPrice,
-          totalDuration: booking.totalDuration,
-          queuePosition: booking.queuePosition,
-          status: booking.status,
-          arrived: booking.arrived || false,
-          arrivedAt: booking.arrivedAt,
-          joinedAt: booking.joinedAt,
-          estimatedStartTime: booking.estimatedStartTime,
-        };
-      }),
+        // ✅ Resolution order:
+        // 1. Linked user name (registered customer)
+        // 2. walkInName (name given without phone)
+        // 3. Token label (anonymous walk-in)
+        customerName:
+          booking.userId?.name ||
+          booking.walkInName ||
+          (booking.walkInToken ? `Token #${booking.walkInToken}` : 'Walk-in Customer'),
+
+        // ✅ Resolution order:
+        // 1. Linked user phone
+        // 2. walkInPhone (if saved defensively)
+        // 3. null (shown as last 4 dashes in Flutter)
+        customerPhone:
+          booking.userId?.phone ||
+          booking.walkInPhone ||
+          null,
+
+        walkInToken: booking.walkInToken || null,
+        walkInName: booking.walkInName || null,   // ✅ expose for Flutter
+        services: booking.services,
+        totalPrice: booking.totalPrice,
+        totalDuration: booking.totalDuration,
+        queuePosition: booking.queuePosition,
+        status: booking.status,
+        arrived: booking.arrived || false,
+        arrivedAt: booking.arrivedAt,
+        joinedAt: booking.joinedAt,
+        estimatedStartTime: booking.estimatedStartTime,
+      }))
+
     });
 
   } catch (error) {

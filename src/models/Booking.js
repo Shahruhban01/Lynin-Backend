@@ -17,6 +17,19 @@ const bookingSchema = new mongoose.Schema(
       index: true,
     },
 
+    // In models/Booking.js — add inside the schema:
+    walkInName: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    walkInPhone: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+
+
     // SCHEDULING DETAILS START
     // ✅ NEW: Booking type and scheduling
     bookingType: {

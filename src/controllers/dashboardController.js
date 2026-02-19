@@ -60,17 +60,17 @@ exports.getDashboardStats = async (req, res) => {
     let waitAccuracyPercentage = 0;
     if (completedBookingsWithTimes.length > 0) {
       let accurateCount = 0;
-      
+
       completedBookingsWithTimes.forEach(booking => {
         const actualWaitTime = (new Date(booking.startedAt) - new Date(booking.joinedAt)) / 1000 / 60;
         const estimatedWaitTime = (new Date(booking.estimatedStartTime) - new Date(booking.joinedAt)) / 1000 / 60;
-        
+
         const margin = estimatedWaitTime * 0.1;
         if (Math.abs(actualWaitTime - estimatedWaitTime) <= margin) {
           accurateCount++;
         }
       });
-      
+
       waitAccuracyPercentage = Math.round((accurateCount / completedBookingsWithTimes.length) * 100);
     }
 
@@ -88,8 +88,8 @@ exports.getDashboardStats = async (req, res) => {
       status: 'no-show',
     });
 
-    const noShowRate = totalScheduledToday > 0 
-      ? Math.round((noShowToday / totalScheduledToday) * 100) 
+    const noShowRate = totalScheduledToday > 0
+      ? Math.round((noShowToday / totalScheduledToday) * 100)
       : 0;
 
     // Peak hours calculation
@@ -134,19 +134,19 @@ exports.getDashboardStats = async (req, res) => {
     // ✅ NEW: Weekly traffic data (last 7 days)
     const weeklyTraffic = {};
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
+
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const nextDate = new Date(date);
       nextDate.setDate(nextDate.getDate() + 1);
-      
+
       const count = await Booking.countDocuments({
         salonId,
         status: 'completed',
         completedAt: { $gte: date, $lt: nextDate },
       });
-      
+
       const dayName = dayNames[date.getDay()];
       weeklyTraffic[dayName] = count;
     }
@@ -212,29 +212,36 @@ exports.getDashboardStats = async (req, res) => {
     });
 
     // Average wait time
-    const completedBookings = await Booking.find({
-      salonId,
-      status: 'completed',
-      completedAt: { $gte: today, $lt: tomorrow },
-      startedAt: { $exists: true },
-      joinedAt: { $exists: true },
-    });
+    const WaitTimeService = require('../services/waitTimeService');
 
-    let totalWaitTime = 0;
-    completedBookings.forEach(booking => {
-      const waitTime = (new Date(booking.startedAt) - new Date(booking.joinedAt)) / 1000 / 60;
-      totalWaitTime += waitTime;
-    });
+    const waitInfo = await WaitTimeService.getWaitTimeForSalon(salon);
 
-    const avgWait = completedBookings.length > 0 
-      ? Math.round(totalWaitTime / completedBookings.length) 
-      : 0;
+    const avgWait = waitInfo.waitMinutes || 0;
+
+
+    // const completedBookings = await Booking.find({
+    //   salonId,
+    //   status: 'completed',
+    //   completedAt: { $gte: today, $lt: tomorrow },
+    //   startedAt: { $exists: true },
+    //   joinedAt: { $exists: true },
+    // });
+
+    // let totalWaitTime = 0;
+    // completedBookings.forEach(booking => {
+    //   const waitTime = (new Date(booking.startedAt) - new Date(booking.joinedAt)) / 1000 / 60;
+    //   totalWaitTime += waitTime;
+    // });
+
+    // const avgWait = completedBookings.length > 0 
+    //   ? Math.round(totalWaitTime / completedBookings.length) 
+    //   : 0;
 
     // Location
     const locationAddress = salon.location?.address || '';
     const locationCity = salon.location?.city || '';
     const locationState = salon.location?.state || '';
-    
+
     let fullAddress = locationAddress;
     if (locationCity) {
       fullAddress = locationCity;
@@ -245,7 +252,7 @@ exports.getDashboardStats = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      
+
       // Dashboard metrics
       customersServed: customersServedToday,
       customersServedYesterday: customersServedYesterday,
@@ -253,23 +260,23 @@ exports.getDashboardStats = async (req, res) => {
       waitAccuracy: waitAccuracyPercentage,
       noShowRate: noShowRate,
       peakHours: peakHoursFormatted,
-      
+
       // Queue stats
       inQueue,
       inService,
       activeBarbers: salon.activeBarbers || salon.totalBarbers || 1,
       avgWait,
-      
+
       // Service stats
       completedServices: totalServicesToday,
       walkInsToday,
-      
+
       // Scheduled bookings
       scheduledToday,
       scheduledPending,
       scheduledArrived,
       scheduledNoShow,
-      
+
       // Salon info
       isOpen: salon.isOpen || false,
       salonName: salon.name,
@@ -277,7 +284,7 @@ exports.getDashboardStats = async (req, res) => {
       city: locationCity,
       state: locationState,
       avgServiceTime: salon.avgServiceTime || 30,
-      
+
       // ✅ NEW: Weekly traffic data
       weeklyTraffic: normalizedWeeklyTraffic,
       weeklyTrafficRaw: weeklyTraffic, // Include raw counts for reference

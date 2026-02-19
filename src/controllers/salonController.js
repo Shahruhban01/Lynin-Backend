@@ -306,6 +306,29 @@ exports.getSalons = async (req, res) => {
   }
 };
 
+// @desc    Get salon services
+// @route   GET /api/salons/:salonId/services
+// @access  Private
+exports.getSalonServices = async (req, res) => {
+  try {
+    const salon = await Salon.findById(req.params.salonId)
+      .select('services')
+      .lean();
+
+    if (!salon) {
+      return res.status(404).json({ success: false, message: 'Salon not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      services: salon.services, // subdocs have auto _id
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
 
 // @desc    Get single salon by ID with wait time
 // @route   GET /api/salons/:id

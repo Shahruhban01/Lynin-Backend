@@ -19,7 +19,6 @@ async function addWalkInCustomer({
 }) {
     // 1️⃣ Validate salon
     const salon = await Salon.findById(salonId);
-
     if (!salon || !salon.isActive) {
         throw new Error('Salon not found or inactive');
     }
@@ -31,6 +30,8 @@ async function addWalkInCustomer({
 
     let userId = null;
     let walkInToken = null;
+    let walkInName = null;   // ✅ NEW
+    let walkInPhone = null;  // ✅ NEW
 
     const hasValidPhone = phone && phone.trim().length >= 10;
     const hasValidName = name && name.trim().length > 0;
@@ -48,21 +49,27 @@ async function addWalkInCustomer({
                 isActive: true,
             });
         } else if (hasValidName && !user.name) {
+            // ✅ Only update name if user didn't already have one
             user.name = name.trim();
             await user.save();
         }
 
         userId = user._id;
-    }
-    // 4️⃣ Handle token
-    else {
+    } else {
+        // ✅ No phone — generate token and save name separately
         walkInToken = await generateWalkInToken(salonId);
+        walkInName = hasValidName ? name.trim() : null;   // ✅ save for display
+    }
+
+    // ✅ Always save phone if provided but no user account was created
+    // (shouldn't happen given above logic, but defensive)
+    if (hasValidPhone && !userId) {
+        walkInPhone = phone.trim();
     }
 
     // 5️⃣ Calculate totals
     let totalPrice = 0;
     let totalDuration = 0;
-
     for (const s of services) {
         totalPrice += s.price;
         totalDuration += s.duration;
@@ -88,7 +95,9 @@ async function addWalkInCustomer({
         arrived: true,
         arrivedAt: new Date(),
         walkInToken,
-        notes: !userId && hasValidName ? `Walk-in: ${name}` : '',
+        walkInName,    // ✅ name when no phone given
+        walkInPhone,   // ✅ defensive field
+        notes: '',
     });
 
     await booking.populate('userId', 'name phone');
@@ -102,6 +111,7 @@ async function addWalkInCustomer({
 
     return booking;
 }
+
 
 /**
  * Mark customer as arrived

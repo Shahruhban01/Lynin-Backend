@@ -3,6 +3,7 @@ const router = express.Router();
 const { requireRole, requireSalonAccess } = require('../middleware/roleCheck');
 const {
   getSalons,
+  getSalonServices,
   getSalonById,
   getNearbySalons,
   createSalon,
@@ -27,6 +28,8 @@ const { protect } = require('../middleware/auth');
 // Public routes (no auth required)
 router.get('/', getSalons);
 router.get('/nearby', getNearbySalons);
+router.get('/:salonId/services', protect, getSalonServices);
+
 
 // Protected routes (auth required)
 // IMPORTANT: Specific routes MUST come before dynamic routes!

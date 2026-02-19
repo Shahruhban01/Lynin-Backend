@@ -13,6 +13,7 @@ router.get('/available-slots/:salonId', protect, bookingController.getAvailableT
 router.post('/join-queue', protect, bookingController.joinQueue);
 router.get('/my-bookings', protect, bookingController.getMyBookings);
 
+
 // ✅ Staff bookings route (BEFORE dynamic routes)
 router.get('/staff/:staffId', protect, bookingController.getStaffBookings);
 
@@ -24,6 +25,9 @@ router.put('/:id/cancel', protect, bookingController.cancelBooking);
 router.put('/:id/complete-payment', protect, bookingController.completePayment);
 router.put('/:id/complete', protect, bookingController.completeBooking);
 router.put('/:id/start', protect, bookingController.startBooking);
+
+router.put('/:bookingId/services', protect, bookingController.updateBookingServices); // ✅ Update services in a booking
+
 
 
 // ✅ Staff assignment routes
