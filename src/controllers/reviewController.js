@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 
 // @desc    Submit rating and review for a booking
 // @route   POST /api/reviews/booking/:bookingId
@@ -61,7 +62,7 @@ exports.submitReview = async (req, res) => {
     // Update salon's average rating
     await updateSalonRating(booking.salonId);
 
-    console.log(`✅ Review submitted for booking: ${bookingId}`);
+    logger.info(`✅ Review submitted for booking: ${bookingId}`);
 
     res.status(200).json({
       success: true,
@@ -69,7 +70,7 @@ exports.submitReview = async (req, res) => {
       booking,
     });
   } catch (error) {
-    console.error('❌ Submit review error:', error);
+    logger.error('❌ Submit review error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to submit review',
@@ -133,7 +134,7 @@ exports.getSalonReviews = async (req, res) => {
       ratingBreakdown,
     });
   } catch (error) {
-    console.error('❌ Get salon reviews error:', error);
+    logger.error('❌ Get salon reviews error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch reviews',
@@ -164,7 +165,7 @@ exports.getMyReviews = async (req, res) => {
       reviews,
     });
   } catch (error) {
-    console.error('❌ Get my reviews error:', error);
+    logger.error('❌ Get my reviews error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch reviews',
@@ -216,7 +217,7 @@ exports.updateReview = async (req, res) => {
     // Update salon's average rating
     await updateSalonRating(booking.salonId);
 
-    console.log(`✅ Review updated for booking: ${bookingId}`);
+    logger.info(`✅ Review updated for booking: ${bookingId}`);
 
     res.status(200).json({
       success: true,
@@ -224,7 +225,7 @@ exports.updateReview = async (req, res) => {
       booking,
     });
   } catch (error) {
-    console.error('❌ Update review error:', error);
+    logger.error('❌ Update review error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update review',
@@ -260,10 +261,10 @@ async function updateSalonRating(salonId) {
         totalReviews: result[0].totalReviews,
       });
 
-      console.log(`✅ Updated salon rating: ${result[0].averageRating.toFixed(1)}`);
+      logger.info(`✅ Updated salon rating: ${result[0].averageRating.toFixed(1)}`);
     }
   } catch (error) {
-    console.error('Error updating salon rating:', error);
+    logger.error('Error updating salon rating:', error);
   }
 }
 

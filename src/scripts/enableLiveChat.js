@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const FeatureFlag = require('../models/FeatureFlag');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
 const tawkScript = `
 <!--Start of Tawk.to Script-->
@@ -21,7 +22,7 @@ s0.parentNode.insertBefore(s1,s0);
 async function enableLiveChat() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    logger.info('✅ Connected to MongoDB');
 
     await FeatureFlag.findOneAndUpdate(
       { key: 'liveChatConfig' },
@@ -34,10 +35,10 @@ async function enableLiveChat() {
       { upsert: true, new: true }
     );
 
-    console.log('✅ Live chat enabled successfully!');
+    logger.info('✅ Live chat enabled successfully!');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error:', error);
+    logger.error('❌ Error:', error);
     process.exit(1);
   }
 }

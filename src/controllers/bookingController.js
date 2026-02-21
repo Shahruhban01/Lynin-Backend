@@ -4,6 +4,7 @@ const User = require('../models/User');
 const NotificationService = require('../services/notificationService');
 // const WaitTimeService = require('../services/waitTimeService');
 const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
+const logger = require('../utils/logger');
 
 
 // Helper to emit wait time update
@@ -25,7 +26,7 @@ const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
 //       });
 //     }
 //   } catch (error) {
-//     console.error('Error emitting wait time update:', error);
+//     logger.error('Error emitting wait time update:', error);
 //   }
 // }
 
@@ -42,11 +43,11 @@ exports.joinQueue = async (req, res) => {
     const { salonId, services, notes, paymentMethod = 'cash' } = req.body;
     const userId = req.user._id;
 
-    console.log('📥 Join queue request:');
-    console.log('   User:', userId);
-    console.log('   Salon:', salonId);
-    console.log('   Services:', JSON.stringify(services));
-    console.log('   Payment:', paymentMethod);
+    logger.info('📥 Join queue request:');
+    logger.info('   User:', userId);
+    logger.info('   Salon:', salonId);
+    logger.info('   Services:', JSON.stringify(services));
+    logger.info('   Payment:', paymentMethod);
 
     // Validate request
     if (!salonId || !services || services.length === 0) {
@@ -195,26 +196,26 @@ exports.joinQueue = async (req, res) => {
         await NotificationService.notifyQueueUpdate(user, booking, salon);
       }
     } catch (notifError) {
-      console.error('❌ Customer notification error:', notifError);
+      logger.error('❌ Customer notification error:', notifError);
     }
 
     // ✅ NEW: Send notification to salon owner if enabled
     // ✅ FIXED: Send notification to salon owner
     try {
-      console.log('📤 Attempting to send notification to salon owner...');
+      logger.info('📤 Attempting to send notification to salon owner...');
 
       // Populate owner if not already populated
       const salonWithOwner = await Salon.findById(salonId).populate('ownerId');
 
       if (!salonWithOwner) {
-        console.log('⚠️ Salon not found for notification');
+        logger.warn('⚠️ Salon not found for notification');
       } else if (!salonWithOwner.ownerId) {
-        console.log('⚠️ Salon owner not found');
-        console.log('   Salon ownerId:', salonWithOwner.ownerId);
+        logger.warn('⚠️ Salon owner not found');
+        logger.info('   Salon ownerId:', salonWithOwner.ownerId);
       } else {
         const owner = salonWithOwner.ownerId;
-        console.log(`👤 Owner found: ${owner.name} (${owner._id})`);
-        console.log(`   FCM Token: ${owner.fcmToken ? 'Present' : 'Missing'}`);
+        logger.info(`👤 Owner found: ${owner.name} (${owner._id})`);
+        logger.info(`   FCM Token: ${owner.fcmToken ? 'Present' : 'Missing'}`);
 
         if (owner.fcmToken) {
           // Get customer info
@@ -228,20 +229,20 @@ exports.joinQueue = async (req, res) => {
             salonWithOwner
           );
 
-          console.log(`✅ New booking notification sent to owner: ${owner.name}`);
+          logger.info(`✅ New booking notification sent to owner: ${owner.name}`);
         } else {
-          console.log('⚠️ Owner FCM token not available');
-          console.log('   Owner may need to login to salon app to register FCM token');
+          logger.warn('⚠️ Owner FCM token not available');
+          logger.info('   Owner may need to login to salon app to register FCM token');
         }
       }
     } catch (notifError) {
-      console.error('❌ Owner notification error:', notifError);
-      console.error('   Stack:', notifError.stack);
+      logger.error('❌ Owner notification error:', notifError);
+      logger.error('   Stack:', notifError.stack);
       // Don't throw - notification failure shouldn't block booking
     }
 
 
-    console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
+    logger.info(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
     await emitWaitTimeUpdate(salonId);
 
 
@@ -251,7 +252,7 @@ exports.joinQueue = async (req, res) => {
       booking,
     });
 
-    // console.log(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
+    // logger.info(`✅ Booking created: User ${userId} joined queue at ${salon.name}`);
 
     // res.status(201).json({
     //   success: true,
@@ -259,7 +260,7 @@ exports.joinQueue = async (req, res) => {
     //   booking,
     // });
   } catch (error) {
-    console.error('❌ Join queue error:', error);
+    logger.error('❌ Join queue error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to join queue',
@@ -306,7 +307,7 @@ exports.updateBookingServices = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Update booking services error:', error);
+    logger.error('❌ Update booking services error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -320,12 +321,12 @@ exports.scheduleBooking = async (req, res) => {
     const { salonId, services, notes, scheduledDate, scheduledTime, paymentMethod = 'cash' } = req.body;
     const userId = req.user._id;
 
-    console.log('📅 Schedule booking request:');
-    console.log('   User:', userId);
-    console.log('   Salon:', salonId);
-    console.log('   Date:', scheduledDate);
-    console.log('   Time:', scheduledTime);
-    console.log('   Services:', JSON.stringify(services));
+    logger.info('📅 Schedule booking request:');
+    logger.info('   User:', userId);
+    logger.info('   Salon:', salonId);
+    logger.info('   Date:', scheduledDate);
+    logger.info('   Time:', scheduledTime);
+    logger.info('   Services:', JSON.stringify(services));
 
     // Validation
     if (!salonId || !services || services.length === 0 || !scheduledDate || !scheduledTime) {
@@ -425,7 +426,7 @@ exports.scheduleBooking = async (req, res) => {
     // Populate references
     await booking.populate('salonId', 'name location phone');
 
-    console.log(`✅ Scheduled booking created: User ${userId} scheduled for ${scheduledDate} ${scheduledTime} at ${salon.name}`);
+    logger.info(`✅ Scheduled booking created: User ${userId} scheduled for ${scheduledDate} ${scheduledTime} at ${salon.name}`);
 
     // Emit socket event to salon room
     if (global.io) {
@@ -443,7 +444,7 @@ exports.scheduleBooking = async (req, res) => {
       booking,
     });
   } catch (error) {
-    console.error('❌ Schedule booking error:', error);
+    logger.error('❌ Schedule booking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to schedule booking',
@@ -543,7 +544,7 @@ exports.getAvailableTimeSlots = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get available slots error:', error);
+    logger.error('❌ Get available slots error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch available slots',
@@ -576,7 +577,7 @@ exports.getMyBookings = async (req, res) => {
       bookings,
     });
   } catch (error) {
-    console.error('❌ Get bookings error:', error);
+    logger.error('❌ Get bookings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch bookings',
@@ -614,7 +615,7 @@ exports.getBookingById = async (req, res) => {
       booking,
     });
   } catch (error) {
-    console.error('❌ Get booking error:', error);
+    logger.error('❌ Get booking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch booking',
@@ -693,7 +694,7 @@ exports.completeBooking = async (req, res) => {
           }
         }
       );
-      console.log(`✅ Booking completed. ${pointsEarned} loyalty points awarded to user ${booking.userId._id}`);
+      logger.info(`✅ Booking completed. ${pointsEarned} loyalty points awarded to user ${booking.userId._id}`);
     }
 
     // ✅ Update staff stats
@@ -706,10 +707,10 @@ exports.completeBooking = async (req, res) => {
           'stats.totalCommission': staffCommission,
         },
       });
-      console.log(`💰 Staff commission: ₹${staffCommission.toFixed(2)}`);
+      logger.info(`💰 Staff commission: ₹${staffCommission.toFixed(2)}`);
     }
 
-    console.log(`💰 Payment auto-marked as paid: ₹${booking.totalPrice}`);
+    logger.info(`💰 Payment auto-marked as paid: ₹${booking.totalPrice}`);
 
     // Update queue positions
     await updateQueuePositions(booking.salonId._id);
@@ -761,7 +762,7 @@ exports.completeBooking = async (req, res) => {
       staffCommission: staffCommission.toFixed(2), // ✅ Return commission info
     });
   } catch (error) {
-    console.error('❌ Complete booking error:', error);
+    logger.error('❌ Complete booking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to complete booking',
@@ -796,10 +797,10 @@ exports.cancelBooking = async (req, res) => {
     const isOwner = booking.salonId.ownerId.toString() === req.user._id.toString();
 
     if (!isCustomer && !isOwner) {
-      console.error('❌ Cancel authorization failed:');
-      console.error('   User ID:', req.user._id);
-      console.error('   Customer ID:', booking.userId._id);
-      console.error('   Owner ID:', booking.salonId.ownerId);
+      logger.error('❌ Cancel authorization failed:');
+      logger.error('   User ID:', req.user._id);
+      logger.error('   Customer ID:', booking.userId._id);
+      logger.error('   Owner ID:', booking.salonId.ownerId);
       return res.status(403).json({
         success: false,
         message: 'Not authorized to cancel this booking',
@@ -857,7 +858,7 @@ exports.cancelBooking = async (req, res) => {
       );
     }
 
-    console.log(`✅ Booking cancelled: ${booking._id} by ${isOwner ? 'owner' : 'customer'}`);
+    logger.info(`✅ Booking cancelled: ${booking._id} by ${isOwner ? 'owner' : 'customer'}`);
 
     await emitWaitTimeUpdate(booking.salonId._id);
 
@@ -868,7 +869,7 @@ exports.cancelBooking = async (req, res) => {
       booking,
     });
   } catch (error) {
-    console.error('❌ Cancel booking error:', error);
+    logger.error('❌ Cancel booking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to cancel booking',
@@ -944,7 +945,7 @@ exports.completePayment = async (req, res) => {
 
     await booking.save();
 
-    console.log(`✅ Payment completed for booking: ${booking._id}`);
+    logger.info(`✅ Payment completed for booking: ${booking._id}`);
 
     res.status(200).json({
       success: true,
@@ -952,7 +953,7 @@ exports.completePayment = async (req, res) => {
       booking,
     });
   } catch (error) {
-    console.error('❌ Complete payment error:', error);
+    logger.error('❌ Complete payment error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to complete payment',
@@ -972,10 +973,10 @@ exports.getSalonBookings = async (req, res) => {
     const { salonId } = req.params;
     const { status, bookingType, startDate, endDate } = req.query;
 
-    console.log('📊 Get salon bookings request:');
-    console.log('   Salon ID:', salonId);
-    console.log('   Status filter:', status);
-    console.log('   Booking type filter:', bookingType);
+    logger.info('📊 Get salon bookings request:');
+    logger.info('   Salon ID:', salonId);
+    logger.info('   Status filter:', status);
+    logger.info('   Booking type filter:', bookingType);
 
     const salon = await Salon.findById(salonId);
 
@@ -1026,11 +1027,11 @@ exports.getSalonBookings = async (req, res) => {
       .sort({ queuePosition: 1, createdAt: -1 })
       .lean();
 
-    console.log(`✅ Found ${bookings.length} bookings`);
+    logger.info(`✅ Found ${bookings.length} bookings`);
 
     // ✅ Log first booking with staff info
     if (bookings.length > 0) {
-      console.log('   First booking:', {
+      logger.info('   First booking:', {
         id: bookings[0]._id,
         status: bookings[0].status,
         assignedStaffId: bookings[0].assignedStaffId, // ✅ CHECK THIS
@@ -1094,7 +1095,7 @@ exports.getSalonBookings = async (req, res) => {
       activeBarbers: salon.activeBarbers || 1,
     });
   } catch (error) {
-    console.error('❌ Get salon bookings error:', error);
+    logger.error('❌ Get salon bookings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch bookings',
@@ -1170,7 +1171,7 @@ exports.startBooking = async (req, res) => {
       }
 
       booking.assignedStaffId = assignedStaffId;
-      console.log(`👤 Assigned staff: ${staff.name} to booking ${booking._id}`);
+      logger.info(`👤 Assigned staff: ${staff.name} to booking ${booking._id}`);
     }
 
     booking.status = 'in-progress';
@@ -1218,7 +1219,7 @@ exports.startBooking = async (req, res) => {
       );
     }
 
-    console.log(`✅ Booking started: ${booking._id}`);
+    logger.info(`✅ Booking started: ${booking._id}`);
     await emitWaitTimeUpdate(booking.salonId._id);
 
     res.status(200).json({
@@ -1227,7 +1228,7 @@ exports.startBooking = async (req, res) => {
       booking,
     });
   } catch (error) {
-    console.error('❌ Start booking error:', error);
+    logger.error('❌ Start booking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to start booking',
@@ -1325,7 +1326,7 @@ exports.assignStaff = async (req, res) => {
       });
     }
 
-    console.log(`✅ Staff ${staff.name} assigned to booking ${booking._id}`);
+    logger.info(`✅ Staff ${staff.name} assigned to booking ${booking._id}`);
 
     // Emit socket event
     if (global.io) {
@@ -1346,7 +1347,7 @@ exports.assignStaff = async (req, res) => {
       booking,
     });
   } catch (error) {
-    console.error('❌ Assign staff error:', error);
+    logger.error('❌ Assign staff error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to assign staff',
@@ -1381,7 +1382,7 @@ exports.getStaffBookings = async (req, res) => {
       bookings,
     });
   } catch (error) {
-    console.error('❌ Get staff bookings error:', error);
+    logger.error('❌ Get staff bookings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch bookings',

@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 
 // 🆕 NEW: Get both today's and tomorrow's scheduled bookings
 // @desc    Get upcoming (today + tomorrow) scheduled bookings for salon
@@ -26,7 +27,7 @@ exports.getUpcomingScheduledBookings = async (req, res) => {
       now.getDate() + 2
     );
 
-    console.log('📅 Getting upcoming bookings (today + tomorrow) for:', {
+    logger.info('📅 Getting upcoming bookings (today + tomorrow) for:', {
       salonId,
       startOfDay,
       endOfTomorrow,
@@ -46,7 +47,7 @@ exports.getUpcomingScheduledBookings = async (req, res) => {
       .populate('userId', 'name phone')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
-    console.log(`✅ ${upcomingBookings.length} upcoming bookings found (today + tomorrow)`);
+    logger.info(`✅ ${upcomingBookings.length} upcoming bookings found (today + tomorrow)`);
 
     res.status(200).json({
       success: true,
@@ -68,7 +69,7 @@ exports.getUpcomingScheduledBookings = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get upcoming scheduled bookings error:', error);
+    logger.error('❌ Get upcoming scheduled bookings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch upcoming scheduled bookings',
@@ -98,7 +99,7 @@ exports.getTodayScheduledBookings = async (req, res) => {
       now.getDate() + 1
     );
 
-    console.log('📅 Getting scheduled bookings for:', {
+    logger.info('📅 Getting scheduled bookings for:', {
       salonId,
       startOfDay,
       endOfDay,
@@ -118,7 +119,7 @@ exports.getTodayScheduledBookings = async (req, res) => {
       .populate('userId', 'name phone')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
-    console.log(`✅ ${todayBookings.length} bookings for today (not yet arrived)`);
+    logger.info(`✅ ${todayBookings.length} bookings for today (not yet arrived)`);
 
     res.status(200).json({
       success: true,
@@ -140,7 +141,7 @@ exports.getTodayScheduledBookings = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get scheduled bookings error:', error);
+    logger.error('❌ Get scheduled bookings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch scheduled bookings',
@@ -170,7 +171,7 @@ exports.gettomorrowScheduledBookings = async (req, res) => {
       now.getDate() + 2
     );
 
-    console.log('📅 Getting tomorrow scheduled bookings for:', {
+    logger.info('📅 Getting tomorrow scheduled bookings for:', {
       salonId,
       startOfTomorrow,
       endOfTomorrow,
@@ -190,7 +191,7 @@ exports.gettomorrowScheduledBookings = async (req, res) => {
       .populate('userId', 'name phone')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
-    console.log(`✅ ${tomorrowBookings.length} bookings for tomorrow (not yet arrived)`);
+    logger.info(`✅ ${tomorrowBookings.length} bookings for tomorrow (not yet arrived)`);
 
     res.status(200).json({
       success: true,
@@ -212,7 +213,7 @@ exports.gettomorrowScheduledBookings = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get tomorrow scheduled bookings error:', error);
+    logger.error('❌ Get tomorrow scheduled bookings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch scheduled bookings',
@@ -259,7 +260,7 @@ exports.markNoShow = async (req, res) => {
     booking.cancellationReason = reason || 'Customer did not arrive';
     await booking.save();
 
-    console.log(`✅ Booking marked as no-show: ${bookingId}`);
+    logger.info(`✅ Booking marked as no-show: ${bookingId}`);
 
     // Emit socket event
     if (global.io) {
@@ -284,7 +285,7 @@ exports.markNoShow = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Mark no-show error:', error);
+    logger.error('❌ Mark no-show error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to mark no-show',
@@ -331,7 +332,7 @@ exports.markScheduledArrived = async (req, res) => {
 
     await booking.save();
 
-    console.log(`✅ Scheduled booking marked as arrived: ${bookingId}, Queue position: ${booking.queuePosition}`);
+    logger.info(`✅ Scheduled booking marked as arrived: ${bookingId}, Queue position: ${booking.queuePosition}`);
 
     // Reorder queue to ensure no gaps
     await _reorderQueuePositions(booking.salonId._id);
@@ -367,7 +368,7 @@ exports.markScheduledArrived = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Mark scheduled arrived error:', error);
+    logger.error('❌ Mark scheduled arrived error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to mark arrival',
@@ -391,9 +392,9 @@ async function _reorderQueuePositions(salonId) {
       }
     }
 
-    console.log(`🔄 Queue reordered for salon ${salonId}: ${activeBookings.length} positions`);
+    logger.info(`🔄 Queue reordered for salon ${salonId}: ${activeBookings.length} positions`);
   } catch (error) {
-    console.error('❌ Reorder queue error:', error);
+    logger.error('❌ Reorder queue error:', error);
   }
 }
 
@@ -410,15 +411,15 @@ exports.debugScheduledBookings = async (req, res) => {
       .sort({ scheduledDate: -1 })
       .limit(10);
 
-    console.log('🔍 DEBUG: All scheduled bookings:', allBookings.length);
+    logger.info('🔍 DEBUG: All scheduled bookings:', allBookings.length);
 
     allBookings.forEach(b => {
-      console.log(`  - ID: ${b._id}`);
-      console.log(`    Date: ${b.scheduledDate}`);
-      console.log(`    Time: ${b.scheduledTime}`);
-      console.log(`    Status: ${b.status}`);
-      console.log(`    Arrived: ${b.arrived}`);
-      console.log('---');
+      logger.info(`  - ID: ${b._id}`);
+      logger.info(`    Date: ${b.scheduledDate}`);
+      logger.info(`    Time: ${b.scheduledTime}`);
+      logger.info(`    Status: ${b.status}`);
+      logger.info(`    Arrived: ${b.arrived}`);
+      logger.info('---');
     });
 
     const now = new Date();
@@ -426,11 +427,11 @@ exports.debugScheduledBookings = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    console.log('🕐 Server timezone info:');
-    console.log('  Now:', now);
-    console.log('  Today start:', today);
-    console.log('  Tomorrow start:', tomorrow);
-    console.log('  Timezone offset:', now.getTimezoneOffset(), 'minutes');
+    logger.info('🕐 Server timezone info:');
+    logger.info('  Now:', now);
+    logger.info('  Today start:', today);
+    logger.info('  Tomorrow start:', tomorrow);
+    logger.info('  Timezone offset:', now.getTimezoneOffset(), 'minutes');
 
     res.json({
       success: true,
@@ -448,7 +449,7 @@ exports.debugScheduledBookings = async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('❌ Debug error:', error);
+    logger.error('❌ Debug error:', error);
     res.status(500).json({ error: error.message });
   }
 };

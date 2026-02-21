@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const path = require('path');
+const logger = require('../utils/logger');
 
 // Initialize Firebase Admin SDK
 const serviceAccount = require(path.resolve(
@@ -16,7 +17,7 @@ const verifyFirebaseToken = async (idToken) => {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     return decodedToken;
   } catch (error) {
-    console.error('Error verifying Firebase token:', error);
+    logger.error('Error verifying Firebase token:', error);
     throw new Error('Invalid Firebase token');
   }
 };

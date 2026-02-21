@@ -1,4 +1,5 @@
 const FeatureFlag = require('../models/FeatureFlag');
+const logger = require('../utils/logger');
 
 // In-memory cache
 let featureFlagCache = null;
@@ -16,7 +17,7 @@ exports.getFeatureFlags = async (req, res) => {
       cacheTimestamp &&
       Date.now() - cacheTimestamp < CACHE_DURATION
     ) {
-      console.log('📦 Serving feature flags from cache');
+      logger.info('📦 Serving feature flags from cache');
       return res.status(200).json({
         success: true,
         cached: true,
@@ -24,19 +25,19 @@ exports.getFeatureFlags = async (req, res) => {
       });
     }
 
-    console.log('🔍 Fetching feature flags from database');
+    logger.info('🔍 Fetching feature flags from database');
 
     const featureFlag = await FeatureFlag.findOne({
       key: 'liveChatConfig',
       isActive: true,
     }).lean();
 
-    console.log('📦 Feature Flag found:', featureFlag ? 'Yes' : 'No');
+    logger.info('📦 Feature Flag found:', featureFlag ? 'Yes' : 'No');
 
     let response;
     
     if (!featureFlag) {
-      console.log('⚠️ No feature flag found, returning defaults');
+      logger.info('⚠️ No feature flag found, returning defaults');
       response = {
         isLiveChatEnabled: false,
         tawkToScript: '',
@@ -46,7 +47,7 @@ exports.getFeatureFlags = async (req, res) => {
         isLiveChatEnabled: featureFlag.isLiveChatEnabled || false,
         tawkToScript: featureFlag.tawkToScript || '',
       };
-      console.log('✅ Feature flags:', {
+      logger.info('✅ Feature flags:', {
         isLiveChatEnabled: response.isLiveChatEnabled,
         hasScript: !!response.tawkToScript,
       });
@@ -68,7 +69,7 @@ exports.getFeatureFlags = async (req, res) => {
       featureFlags: response,
     });
   } catch (error) {
-    console.error('❌ Get feature flags error:', error);
+    logger.error('❌ Get feature flags error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch feature flags',
@@ -105,7 +106,7 @@ exports.updateFeatureFlags = async (req, res) => {
       featureFlag,
     });
   } catch (error) {
-    console.error('❌ Update feature flags error:', error);
+    logger.error('❌ Update feature flags error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update feature flags',

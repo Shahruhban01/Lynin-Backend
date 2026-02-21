@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * Role-Based Access Control Middleware
  * Protects salon-side routes based on user roles and permissions
@@ -18,7 +19,7 @@ exports.requireRole = (allowedRoles) => {
 
       // Check if user has one of the allowed roles
       if (!allowedRoles.includes(user.role)) {
-        console.warn(`🚫 Access denied for user ${user._id} with role: ${user.role}`);
+        logger.warn(`🚫 Access denied for user ${user._id} with role: ${user.role}`);
         return res.status(403).json({
           success: false,
           message: 'Insufficient permissions',
@@ -27,10 +28,10 @@ exports.requireRole = (allowedRoles) => {
         });
       }
 
-      console.log(`✅ Role check passed: ${user.role} accessing ${req.path}`);
+      logger.info(`✅ Role check passed: ${user.role} accessing ${req.path}`);
       next();
     } catch (error) {
-      console.error('❌ Role check error:', error);
+      logger.error('❌ Role check error:', error);
       res.status(500).json({
         success: false,
         message: 'Authorization failed',
@@ -55,7 +56,7 @@ exports.requirePermissions = (requiredPermissions) => {
 
       // Owner role bypasses permission checks
       if (user.role === 'owner') {
-        console.log(`✅ Owner bypass: ${user._id}`);
+        logger.info(`✅ Owner bypass: ${user._id}`);
         return next();
       }
 
@@ -74,10 +75,10 @@ exports.requirePermissions = (requiredPermissions) => {
         });
       }
 
-      console.log(`✅ Permission check passed: ${user._id}`);
+      logger.info(`✅ Permission check passed: ${user._id}`);
       next();
     } catch (error) {
-      console.error('❌ Permission check error:', error);
+      logger.error('❌ Permission check error:', error);
       res.status(500).json({
         success: false,
         message: 'Authorization failed',
@@ -122,10 +123,10 @@ exports.requireSalonAccess = (salonIdParam = 'salonId') => {
         });
       }
 
-      console.log(`✅ Salon access granted: ${user._id} → ${requestedSalonId}`);
+      logger.info(`✅ Salon access granted: ${user._id} → ${requestedSalonId}`);
       next();
     } catch (error) {
-      console.error('❌ Salon access check error:', error);
+      logger.error('❌ Salon access check error:', error);
       res.status(500).json({
         success: false,
         message: 'Authorization failed',
@@ -162,7 +163,7 @@ exports.requireSetupComplete = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('❌ Setup check error:', error);
+    logger.error('❌ Setup check error:', error);
     res.status(500).json({
       success: false,
       message: 'Authorization failed',
@@ -245,7 +246,7 @@ exports.requireSalonAccess = (salonIdParam = 'salonId') => {
         message: 'You do not have access to this salon',
       });
     } catch (error) {
-      console.error('❌ Salon access check error:', error);
+      logger.error('❌ Salon access check error:', error);
       return res.status(500).json({
         success: false,
         message: 'Access verification failed',

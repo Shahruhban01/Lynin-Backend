@@ -1,4 +1,5 @@
 const AppInfo = require('../models/AppInfo');
+const logger = require('../utils/logger');
 
 // In-memory cache
 let appInfoCache = null;
@@ -16,7 +17,7 @@ exports.getAppInfo = async (req, res) => {
       cacheTimestamp &&
       Date.now() - cacheTimestamp < CACHE_DURATION
     ) {
-      console.log('📦 Serving app info from cache');
+      logger.info('📦 Serving app info from cache');
       return res.status(200).json({
         success: true,
         cached: true,
@@ -24,7 +25,7 @@ exports.getAppInfo = async (req, res) => {
       });
     }
 
-    console.log('🔍 Fetching app info from database');
+    logger.info('🔍 Fetching app info from database');
 
     const appInfo = await AppInfo.findOne({ isActive: true })
       .select('-__v -createdAt -updatedAt')
@@ -40,7 +41,7 @@ exports.getAppInfo = async (req, res) => {
     // Cache the result
     appInfoCache = appInfo;
     cacheTimestamp = Date.now();
-    console.log('💾 App info cached successfully');
+    logger.info('💾 App info cached successfully');
 
     // Set cache headers for CDN
     res.set({
@@ -54,7 +55,7 @@ exports.getAppInfo = async (req, res) => {
       appInfo,
     });
   } catch (error) {
-    console.error('❌ Get app info error:', error);
+    logger.error('❌ Get app info error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch app info',
@@ -89,7 +90,7 @@ exports.updateAppInfo = async (req, res) => {
       appInfo,
     });
   } catch (error) {
-    console.error('❌ Update app info error:', error);
+    logger.error('❌ Update app info error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update app info',
@@ -111,6 +112,7 @@ exports.clearCache = async (req, res) => {
       message: 'App info cache cleared',
     });
   } catch (error) {
+    logger.error('❌ Failed to clear app info cache:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to clear cache',

@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Salon = require('../models/Salon');
+const logger = require('../utils/logger');
 
 // @desc    Get current setup status
 // @route   GET /api/salon-setup/status
@@ -15,7 +16,7 @@ exports.getSetupStatus = async (req, res) => {
       salon: user.salonId || null,
     });
   } catch (error) {
-    console.error('❌ Get setup status error:', error);
+    logger.error('❌ Get setup status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get setup status',
@@ -66,7 +67,7 @@ exports.saveProfileSetup = async (req, res) => {
       salon.images = images || []; // ✅ NEW: Save images
       await salon.save();
 
-      console.log(`✅ Updated existing salon: ${salon._id}`);
+      logger.info(`✅ Updated existing salon: ${salon._id}`);
     } else {
       // Create new salon
       salon = await Salon.create({
@@ -90,7 +91,7 @@ exports.saveProfileSetup = async (req, res) => {
 
       // Link salon to user
       user.salonId = salon._id;
-      console.log(`✅ Created new salon: ${salon._id}`);
+      logger.info(`✅ Created new salon: ${salon._id}`);
     }
 
     // Update user setup progress
@@ -109,7 +110,7 @@ exports.saveProfileSetup = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Profile setup error:', error);
+    logger.error('❌ Profile setup error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to save profile',
@@ -153,7 +154,7 @@ exports.saveHoursSetup = async (req, res) => {
     user.setupStep = 'services';
     await user.save();
 
-    console.log(`✅ Hours setup saved for salon: ${salon._id}`);
+    logger.info(`✅ Hours setup saved for salon: ${salon._id}`);
 
     res.status(200).json({
       success: true,
@@ -161,7 +162,7 @@ exports.saveHoursSetup = async (req, res) => {
       nextStep: 'services',
     });
   } catch (error) {
-    console.error('❌ Hours setup error:', error);
+    logger.error('❌ Hours setup error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to save hours',
@@ -232,7 +233,7 @@ exports.saveServicesSetup = async (req, res) => {
     user.setupStep = 'capacity';
     await user.save();
 
-    console.log(`✅ Services setup saved for salon: ${salon._id} (${services.length} services)`);
+    logger.info(`✅ Services setup saved for salon: ${salon._id} (${services.length} services)`);
 
     res.status(200).json({
       success: true,
@@ -241,7 +242,7 @@ exports.saveServicesSetup = async (req, res) => {
       servicesCount: services.length,
     });
   } catch (error) {
-    console.error('❌ Services setup error:', error);
+    logger.error('❌ Services setup error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to save services',
@@ -294,7 +295,7 @@ exports.saveServicesSetup = async (req, res) => {
 //     user.setupStep = 'capacity';
 //     await user.save();
 
-//     console.log(`✅ Services setup saved for salon: ${salon._id} (${services.length} services)`);
+//     logger.info(`✅ Services setup saved for salon: ${salon._id} (${services.length} services)`);
 
 //     res.status(200).json({
 //       success: true,
@@ -303,7 +304,7 @@ exports.saveServicesSetup = async (req, res) => {
 //       servicesCount: services.length,
 //     });
 //   } catch (error) {
-//     console.error('❌ Services setup error:', error);
+//     logger.error('❌ Services setup error:', error);
 //     res.status(500).json({
 //       success: false,
 //       message: 'Failed to save services',
@@ -348,7 +349,7 @@ exports.saveCapacitySetup = async (req, res) => {
     user.setupStep = 'completed';
     await user.save();
 
-    console.log(`✅ Capacity setup saved for salon: ${salon._id}`);
+    logger.info(`✅ Capacity setup saved for salon: ${salon._id}`);
 
     res.status(200).json({
       success: true,
@@ -356,7 +357,7 @@ exports.saveCapacitySetup = async (req, res) => {
       nextStep: 'complete',
     });
   } catch (error) {
-    console.error('❌ Capacity setup error:', error);
+    logger.error('❌ Capacity setup error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to save capacity',
@@ -404,7 +405,7 @@ exports.completeSetup = async (req, res) => {
     salon.isActive = true;
     await salon.save();
 
-    console.log(`✅ Setup completed for salon: ${salon._id}`);
+    logger.info(`✅ Setup completed for salon: ${salon._id}`);
 
     res.status(200).json({
       success: true,
@@ -416,7 +417,7 @@ exports.completeSetup = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Complete setup error:', error);
+    logger.error('❌ Complete setup error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to complete setup',

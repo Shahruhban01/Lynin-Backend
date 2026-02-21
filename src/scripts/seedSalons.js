@@ -2,10 +2,11 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 
 const connectDB = async () => {
   await mongoose.connect(process.env.MONGODB_URI);
-  console.log('✅ MongoDB Connected');
+  logger.info('✅ MongoDB Connected');
 };
 
 const sampleSalons = [
@@ -195,7 +196,7 @@ const seedSalons = async () => {
     let owner = await User.findOne();
     
     if (!owner) {
-      console.log('⚠️  No users found. Creating dummy owner...');
+      logger.info('⚠️  No users found. Creating dummy owner...');
       owner = await User.create({
         phone: '+919999999999',
         name: 'Salon Owner',
@@ -206,7 +207,7 @@ const seedSalons = async () => {
 
     // Delete existing salons
     await Salon.deleteMany({});
-    console.log('🗑️  Existing salons deleted');
+    logger.info('🗑️  Existing salons deleted');
 
     // Add ownerId to each salon
     const salonsWithOwner = sampleSalons.map((salon) => ({
@@ -216,11 +217,11 @@ const seedSalons = async () => {
 
     // Insert salons
     const createdSalons = await Salon.insertMany(salonsWithOwner);
-    console.log(`✅ ${createdSalons.length} salons created successfully!`);
+    logger.info(`✅ ${createdSalons.length} salons created successfully!`);
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Seed error:', error);
+    logger.error('❌ Seed error:', error);
     process.exit(1);
   }
 };

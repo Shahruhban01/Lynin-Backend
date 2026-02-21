@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const path = require('path');
+const logger = require('../utils/logger');
 
 // Load .env from root directory
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -9,26 +10,26 @@ const createFirstAdmin = async () => {
   try {
     // Check if MONGODB_URI exists
     if (!process.env.MONGODB_URI) {
-      console.error('❌ MONGODB_URI not found in environment variables');
-      console.log('Available env keys:', Object.keys(process.env).filter(k => k.includes('MONGO')));
+      logger.error('❌ MONGODB_URI not found in environment variables');
+      logger.info('Available env keys:', Object.keys(process.env).filter(k => k.includes('MONGO')));
       process.exit(1);
     }
 
-    console.log('🔄 Connecting to MongoDB...');
+    logger.info('🔄 Connecting to MongoDB...');
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    logger.info('✅ Connected to MongoDB');
 
     // Check if admin already exists
     const existingAdmin = await User.findOne({ role: 'admin' });
     
     if (existingAdmin) {
-      console.log('❌ Admin user already exists');
-      console.log('Existing admin:', existingAdmin.name, existingAdmin.phone);
+      logger.info('❌ Admin user already exists');
+      logger.info('Existing admin:', existingAdmin.name, existingAdmin.phone);
       await mongoose.disconnect();
       process.exit(0);
     }
 
-    console.log('🔄 Creating admin user...');
+    logger.info('🔄 Creating admin user...');
 
     // Create admin user
     const admin = await User.create({
@@ -41,22 +42,22 @@ const createFirstAdmin = async () => {
       setupCompleted: true,
     });
 
-    console.log('✅ Admin user created successfully');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('Admin Details:');
-    console.log('  ID:', admin._id);
-    console.log('  Name:', admin.name);
-    console.log('  Phone:', admin.phone);
-    console.log('  Email:', admin.email);
-    console.log('  Role:', admin.role);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('⚠️  IMPORTANT: Update firebaseUid with real Firebase UID');
-    console.log('⚠️  Then login via your auth system to get JWT token');
+    logger.info('✅ Admin user created successfully');
+    logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.info('Admin Details:');
+    logger.info('  ID:', admin._id);
+    logger.info('  Name:', admin.name);
+    logger.info('  Phone:', admin.phone);
+    logger.info('  Email:', admin.email);
+    logger.info('  Role:', admin.role);
+    logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.info('⚠️  IMPORTANT: Update firebaseUid with real Firebase UID');
+    logger.info('⚠️  Then login via your auth system to get JWT token');
     
     await mongoose.disconnect();
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error creating admin:', error.message);
+    logger.error('❌ Error creating admin:', error.message);
     await mongoose.disconnect();
     process.exit(1);
   }

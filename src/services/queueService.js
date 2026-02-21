@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Staff = require('../models/Staff');
 const PriorityLog = require('../models/PriorityLog');
 const NotificationService = require('./notificationService');
+const logger = require('../utils/logger');
 
 
 const { generateWalkInToken } = require('./tokenService');
@@ -187,7 +188,7 @@ async function startService(salonId, bookingId) {
 
     await booking.save();
 
-    console.log(`▶️ Service started: ${bookingId}`);
+    logger.info(`▶️ Service started: ${bookingId}`);
 
     return booking;
 }

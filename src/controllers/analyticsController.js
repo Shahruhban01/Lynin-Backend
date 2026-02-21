@@ -116,7 +116,7 @@ exports.getSalonAnalytics = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get analytics error:', error);
+    logger.error('❌ Get analytics error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch analytics',

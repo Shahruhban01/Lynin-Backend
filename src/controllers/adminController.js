@@ -3,6 +3,7 @@ const Salon = require('../models/Salon');
 const Booking = require('../models/Booking');
 const AdminAuditLog = require('../models/AdminAuditLog');
 const mongoose = require('mongoose');
+const logger = require('../utils/logger');
 
 // ================================
 // PLATFORM STATISTICS
@@ -67,7 +68,7 @@ exports.getPlatformStatistics = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get statistics error:', error);
+    logger.error('❌ Get statistics error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch statistics', error: error.message });
   }
 };
@@ -102,7 +103,7 @@ exports.getUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get users error:', error);
+    logger.error('❌ Get users error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch users', error: error.message });
   }
 };
@@ -135,7 +136,7 @@ exports.getUserDetails = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get user details error:', error);
+    logger.error('❌ Get user details error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch user details', error: error.message });
   }
 };
@@ -169,7 +170,7 @@ exports.softDeleteUser = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'User deleted successfully', data: { userId: user._id, cancelledBookings: cancelledBookings.modifiedCount } });
   } catch (error) {
-    console.error('❌ Soft delete user error:', error);
+    logger.error('❌ Soft delete user error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete user', error: error.message });
   }
 };
@@ -189,7 +190,7 @@ exports.restoreUser = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'User restored successfully', data: { userId: user._id } });
   } catch (error) {
-    console.error('❌ Restore user error:', error);
+    logger.error('❌ Restore user error:', error);
     res.status(500).json({ success: false, message: 'Failed to restore user', error: error.message });
   }
 };
@@ -202,7 +203,7 @@ exports.getCities = async (req, res) => {
     const cities = await Salon.distinct('location.city', { isActive: true });
     res.status(200).json({ success: true, cities: cities.filter(Boolean).sort() });
   } catch (error) {
-    console.error('❌ Get cities error:', error);
+    logger.error('❌ Get cities error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch cities', error: error.message });
   }
 };
@@ -249,7 +250,7 @@ exports.getSalons = async (req, res) => {
 
     res.status(200).json({ success: true, salons: formattedSalons, totalPages: Math.ceil(totalSalons / parseInt(limit)), total: totalSalons, currentPage: parseInt(page) });
   } catch (error) {
-    console.error('❌ Get salons error:', error);
+    logger.error('❌ Get salons error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch salons', error: error.message });
   }
 };
@@ -286,7 +287,7 @@ exports.getSalonDetails = async (req, res) => {
 
     res.status(200).json({ success: true, salon: formattedSalon, stats: { totalBookings, completedBookings, totalRevenue } });
   } catch (error) {
-    console.error('❌ Get salon details error:', error);
+    logger.error('❌ Get salon details error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch salon details', error: error.message });
   }
 };
@@ -312,7 +313,7 @@ exports.getSalonQueue = async (req, res) => {
 
     res.status(200).json({ success: true, queue: formattedQueue });
   } catch (error) {
-    console.error('❌ Get salon queue error:', error);
+    logger.error('❌ Get salon queue error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch queue', error: error.message });
   }
 };
@@ -340,7 +341,7 @@ exports.verifySalon = async (req, res) => {
 
     res.status(200).json({ success: true, message: `Salon ${verified ? 'verified' : 'unverified'} successfully`, data: { salonId: salon._id, isVerified: salon.isVerified } });
   } catch (error) {
-    console.error('❌ Verify salon error:', error);
+    logger.error('❌ Verify salon error:', error);
     res.status(500).json({ success: false, message: 'Failed to update salon verification', error: error.message });
   }
 };
@@ -364,7 +365,7 @@ exports.disableSalon = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Salon disabled successfully', data: { salonId: salon._id, isActive: salon.isActive, currentQueueSize: salon.currentQueueSize } });
   } catch (error) {
-    console.error('❌ Disable salon error:', error);
+    logger.error('❌ Disable salon error:', error);
     res.status(500).json({ success: false, message: 'Failed to disable salon', error: error.message });
   }
 };
@@ -384,7 +385,7 @@ exports.enableSalon = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Salon enabled successfully', data: { salonId: salon._id } });
   } catch (error) {
-    console.error('❌ Enable salon error:', error);
+    logger.error('❌ Enable salon error:', error);
     res.status(500).json({ success: false, message: 'Failed to enable salon', error: error.message });
   }
 };
@@ -413,7 +414,7 @@ exports.getBookings = async (req, res) => {
 
     res.status(200).json({ success: true, data: { bookings, pagination: { currentPage: parseInt(page), totalPages: Math.ceil(totalBookings / parseInt(limit)), totalBookings, limit: parseInt(limit) } } });
   } catch (error) {
-    console.error('❌ Get bookings error:', error);
+    logger.error('❌ Get bookings error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch bookings', error: error.message });
   }
 };
@@ -427,7 +428,7 @@ exports.getBookingDetails = async (req, res) => {
 
     res.status(200).json({ success: true, data: { booking } });
   } catch (error) {
-    console.error('❌ Get booking details error:', error);
+    logger.error('❌ Get booking details error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch booking details', error: error.message });
   }
 };
@@ -457,7 +458,7 @@ exports.getAuditLogs = async (req, res) => {
 
     res.status(200).json({ success: true, data: { logs, pagination: { currentPage: parseInt(page), totalPages: Math.ceil(totalLogs / parseInt(limit)), totalLogs, limit: parseInt(limit) } } });
   } catch (error) {
-    console.error('❌ Get audit logs error:', error);
+    logger.error('❌ Get audit logs error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch audit logs', error: error.message });
   }
 };

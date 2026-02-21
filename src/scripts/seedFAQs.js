@@ -7,10 +7,11 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const FAQ = require('../models/FAQ');
+const logger = require('../utils/logger');
 
 // Hard stop if env is broken
 if (!process.env.MONGODB_URI) {
-  console.error('❌ MONGODB_URI is not defined');
+  logger.error('❌ MONGODB_URI is not defined');
   process.exit(1);
 }
 
@@ -151,18 +152,18 @@ const faqs = [
 async function seed() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    logger.info('✅ Connected to MongoDB');
 
     await FAQ.deleteMany({});
-    console.log('🗑️  Existing FAQs cleared');
+    logger.info('🗑️  Existing FAQs cleared');
 
     await FAQ.insertMany(faqs);
-    console.log(`✅ ${faqs.length} FAQs seeded successfully`);
+    logger.info(`✅ ${faqs.length} FAQs seeded successfully`);
 
     await mongoose.disconnect();
     process.exit(0);
   } catch (err) {
-    console.error('❌ Seed error:', err);
+    logger.error('❌ Seed error:', err);
     await mongoose.disconnect();
     process.exit(1);
   }

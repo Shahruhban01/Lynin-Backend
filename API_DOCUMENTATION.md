@@ -3375,7 +3375,7 @@ socket.emit('join_salon', { salonId: '60d5f484f1b2c72d88f8a1b2' });
 **Server Response:**
 ```javascript
 socket.on('joined_salon', (data) => {
-  console.log('Joined salon room:', data.salonId);
+  logger.info('Joined salon room:', data.salonId);
 });
 ```
 
@@ -3411,7 +3411,7 @@ socket.emit('leave_salon', { salonId: '60d5f484f1b2c72d88f8a1b2' });
 **Client Usage:**
 ```javascript
 socket.on('queue_updated', (data) => {
-  console.log('Queue updated:', data);
+  logger.info('Queue updated:', data);
   // Refresh queue list
   fetchQueue(data.salonId);
 });
@@ -3454,9 +3454,9 @@ socket.on('queue_updated', (data) => {
 ```javascript
 socket.on('wait_time_updated', (data) => {
   if (data.waitTime.isInQueue) {
-    console.log(`Your turn in ${data.waitTime.waitMinutes} minutes`);
+    logger.info(`Your turn in ${data.waitTime.waitMinutes} minutes`);
   } else {
-    console.log(`Current wait: ${data.waitTime.displayText}`);
+    logger.info(`Current wait: ${data.waitTime.displayText}`);
   }
 });
 ```
@@ -4738,7 +4738,7 @@ const connectDB = async () => {
     useNewUrlParser: true,
     useUnifiedTopology: true
   });
-  console.log('✅ MongoDB Connected');
+  logger.info('✅ MongoDB Connected');
 };
 ```
 
@@ -4771,7 +4771,7 @@ io.use(async (socket, next) => {
 ReminderService.startScheduler();
 
 server.listen(3000, () => {
-  console.log('🚀 Server running on port 3000');
+  logger.info('🚀 Server running on port 3000');
 });
 ```
 

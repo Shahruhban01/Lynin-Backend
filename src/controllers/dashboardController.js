@@ -290,7 +290,7 @@ exports.getDashboardStats = async (req, res) => {
       weeklyTrafficRaw: weeklyTraffic, // Include raw counts for reference
     });
   } catch (error) {
-    console.error('❌ Dashboard stats error:', error);
+    logger.error('❌ Dashboard stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch dashboard stats',

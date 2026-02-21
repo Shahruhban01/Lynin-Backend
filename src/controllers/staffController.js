@@ -1,6 +1,7 @@
 const Staff = require('../models/Staff');
 const Salon = require('../models/Salon');
 const Booking = require('../models/Booking');
+const logger = require('../utils/logger');
 
 // @desc    Get all staff for a salon
 // @route   GET /api/staff/salon/:salonId
@@ -36,7 +37,7 @@ exports.getStaffBySalon = async (req, res) => {
 
     const staff = await Staff.find(query).sort('-createdAt');
 
-    console.log(`📊 Fetched ${staff.length} staff members for salon ${salonId}`);
+    logger.info(`📊 Fetched ${staff.length} staff members for salon ${salonId}`);
 
     res.status(200).json({
       success: true,
@@ -44,7 +45,7 @@ exports.getStaffBySalon = async (req, res) => {
       staff,
     });
   } catch (error) {
-    console.error('❌ Get staff error:', error);
+    logger.error('❌ Get staff error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch staff',
@@ -75,7 +76,7 @@ exports.getStaffById = async (req, res) => {
       staff,
     });
   } catch (error) {
-    console.error('❌ Get staff error:', error);
+    logger.error('❌ Get staff error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch staff',
@@ -104,11 +105,11 @@ exports.addStaff = async (req, res) => {
       staffSystemEnabled,
     } = req.body;
 
-    console.log('👤 Add staff request:');
-    console.log('   Salon:', salonId);
-    console.log('   Name:', name);
-    console.log('   Role:', role);
-    console.log('   Staff System Enabled:', staffSystemEnabled);
+    logger.info('👤 Add staff request:');
+    logger.info('   Salon:', salonId);
+    logger.info('   Name:', name);
+    logger.info('   Role:', role);
+    logger.info('   Staff System Enabled:', staffSystemEnabled);
 
     // Validation
     if (!salonId || !name || !email || !phone) {
@@ -169,7 +170,7 @@ exports.addStaff = async (req, res) => {
       );
     }
 
-    console.log(`✅ Staff member added: ${staff.name} (${staff.role})`);
+    logger.info(`✅ Staff member added: ${staff.name} (${staff.role})`);
 
     res.status(201).json({
       success: true,
@@ -177,7 +178,7 @@ exports.addStaff = async (req, res) => {
       staff,
     });
   } catch (error) {
-    console.error('❌ Add staff error:', error);
+    logger.error('❌ Add staff error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to add staff',
@@ -234,7 +235,7 @@ exports.updateStaff = async (req, res) => {
 
     await staff.save();
 
-    console.log(`✅ Staff updated: ${staff.name}`);
+    logger.info(`✅ Staff updated: ${staff.name}`);
 
     res.status(200).json({
       success: true,
@@ -242,7 +243,7 @@ exports.updateStaff = async (req, res) => {
       staff,
     });
   } catch (error) {
-    console.error('❌ Update staff error:', error);
+    logger.error('❌ Update staff error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update staff',
@@ -284,14 +285,14 @@ exports.deleteStaff = async (req, res) => {
 
     // ✅ Check if already inactive → permanent delete
     if (!staff.isActive) {
-      console.log(`🔥 Staff ${staff.name} is already inactive, PERMANENTLY DELETING...`);
+      logger.info(`🔥 Staff ${staff.name} is already inactive, PERMANENTLY DELETING...`);
 
       // Optional: Delete their booking history
       // await Booking.deleteMany({ assignedStaffId: staff._id });
 
       await Staff.findByIdAndDelete(staff._id);
 
-      console.log(`✅ Staff ${staff.name} PERMANENTLY DELETED`);
+      logger.info(`✅ Staff ${staff.name} PERMANENTLY DELETED`);
 
       return res.status(200).json({
         success: true,
@@ -334,7 +335,7 @@ exports.deleteStaff = async (req, res) => {
       await Salon.findByIdAndUpdate(staff.salonId, update);
     }
 
-    console.log(
+    logger.info(
       `✅ Staff ${staff.name} deactivated | barber=${wasBarber} | active=${wasAvailableBarber}`
     );
 
@@ -344,7 +345,7 @@ exports.deleteStaff = async (req, res) => {
       permanent: false,
     });
   } catch (error) {
-    console.error('❌ Delete staff error:', error);
+    logger.error('❌ Delete staff error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete staff',
@@ -363,7 +364,7 @@ exports.getStaffPerformance = async (req, res) => {
     const staffId = req.params.id; // ✅ Changed from req.params.staffId
     const { startDate, endDate } = req.query;
 
-    console.log(`📊 Getting performance for staff: ${staffId}`);
+    logger.info(`📊 Getting performance for staff: ${staffId}`);
 
     // Validate staffId
     if (!staffId || staffId === 'undefined') {
@@ -376,14 +377,14 @@ exports.getStaffPerformance = async (req, res) => {
     // Get staff details
     const staff = await Staff.findById(staffId);
     if (!staff) {
-      console.log(`❌ Staff not found: ${staffId}`);
+      logger.info(`❌ Staff not found: ${staffId}`);
       return res.status(404).json({
         success: false,
         message: 'Staff member not found',
       });
     }
 
-    console.log(`✅ Found staff: ${staff.name}`);
+    logger.info(`✅ Found staff: ${staff.name}`);
 
     // Verify ownership
     const salon = await Salon.findById(staff.salonId);
@@ -407,7 +408,7 @@ exports.getStaffPerformance = async (req, res) => {
         $lte: end,
       };
       
-      console.log(`📅 Date range: ${start.toDateString()} to ${end.toDateString()}`);
+      logger.info(`📅 Date range: ${start.toDateString()} to ${end.toDateString()}`);
     }
 
     // Get all bookings for this staff (completed only)
@@ -419,7 +420,7 @@ exports.getStaffPerformance = async (req, res) => {
       .sort({ completedAt: -1 })
       .limit(50);
 
-    console.log(`✅ Found ${allBookings.length} completed bookings`);
+    logger.info(`✅ Found ${allBookings.length} completed bookings`);
 
     // Calculate metrics
     const totalBookings = allBookings.length;
@@ -533,7 +534,7 @@ exports.getStaffPerformance = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Staff performance error:', error);
+    logger.error('❌ Staff performance error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch staff performance',
@@ -582,7 +583,7 @@ exports.checkStaffAvailability = async (req, res) => {
       } : null,
     });
   } catch (error) {
-    console.error('❌ Check availability error:', error);
+    logger.error('❌ Check availability error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to check availability',
@@ -623,7 +624,7 @@ exports.toggleAvailability = async (req, res) => {
       );
     }
 
-    console.log(
+    logger.info(
       `✅ ${staff.name} availability changed: ${previousAvailability} → ${staff.isAvailable}`
     );
 
@@ -634,7 +635,7 @@ exports.toggleAvailability = async (req, res) => {
       isAvailable: staff.isAvailable,
     });
   } catch (error) {
-    console.error('❌ Toggle availability error:', error);
+    logger.error('❌ Toggle availability error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to toggle availability',
@@ -660,7 +661,7 @@ exports.bulkDeleteStaff = async (req, res) => {
       });
     }
 
-    console.log(`🗑️ Bulk delete request for ${staffIds.length} staff members`);
+    logger.info(`🗑️ Bulk delete request for ${staffIds.length} staff members`);
 
     // Get staff to verify ownership
     const staffMembers = await Staff.find({ _id: { $in: staffIds } });
@@ -693,8 +694,8 @@ exports.bulkDeleteStaff = async (req, res) => {
     const activeStaff = staffMembers.filter(s => s.isActive);
     const inactiveStaff = staffMembers.filter(s => !s.isActive);
 
-    console.log(`   Active staff: ${activeStaff.length}`);
-    console.log(`   Already inactive: ${inactiveStaff.length}`);
+    logger.info(`   Active staff: ${activeStaff.length}`);
+    logger.info(`   Already inactive: ${inactiveStaff.length}`);
 
     // Check for active bookings (only for active staff)
     if (activeStaff.length > 0) {
@@ -742,7 +743,7 @@ exports.bulkDeleteStaff = async (req, res) => {
       );
 
       softDeletedCount = activeStaff.length;
-      console.log(`   ✅ Soft deleted: ${softDeletedCount}`);
+      logger.info(`   ✅ Soft deleted: ${softDeletedCount}`);
     }
 
     // ✅ STEP 2: Permanently delete already-inactive staff
@@ -754,7 +755,7 @@ exports.bulkDeleteStaff = async (req, res) => {
 
       const deleteResult = await Staff.deleteMany({ _id: { $in: inactiveStaffIds } });
       permanentDeletedCount = deleteResult.deletedCount;
-      console.log(`   🔥 PERMANENTLY deleted: ${permanentDeletedCount}`);
+      logger.info(`   🔥 PERMANENTLY deleted: ${permanentDeletedCount}`);
     }
 
     // Update salon counters (only for active staff that were soft-deleted)
@@ -768,7 +769,7 @@ exports.bulkDeleteStaff = async (req, res) => {
           },
         }
       );
-      console.log(`   📊 Salon counters updated: -${barbersToRemove} total, -${activeBarbersToRemove} active`);
+      logger.info(`   📊 Salon counters updated: -${barbersToRemove} total, -${activeBarbersToRemove} active`);
     }
 
     // Build response message
@@ -790,7 +791,7 @@ exports.bulkDeleteStaff = async (req, res) => {
       barbersRemoved: barbersToRemove,
     });
   } catch (error) {
-    console.error('❌ Bulk delete staff error:', error);
+    logger.error('❌ Bulk delete staff error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete staff members',
@@ -822,7 +823,7 @@ exports.bulkUpdateStatus = async (req, res) => {
       });
     }
 
-    console.log(`🔄 Bulk status update for ${staffIds.length} staff: ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+    logger.info(`🔄 Bulk status update for ${staffIds.length} staff: ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
 
     // Get staff to verify ownership
     const staffMembers = await Staff.find({ _id: { $in: staffIds } });
@@ -896,8 +897,8 @@ exports.bulkUpdateStatus = async (req, res) => {
       );
     }
 
-    console.log(`✅ Bulk updated ${staffMembers.length} staff to ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
-    console.log(`   Barber count change: ${barberCountChange}, Active: ${activeBarberCountChange}`);
+    logger.info(`✅ Bulk updated ${staffMembers.length} staff to ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+    logger.info(`   Barber count change: ${barberCountChange}, Active: ${activeBarberCountChange}`);
 
     res.status(200).json({
       success: true,
@@ -905,7 +906,7 @@ exports.bulkUpdateStatus = async (req, res) => {
       updatedCount: staffMembers.length,
     });
   } catch (error) {
-    console.error('❌ Bulk update status error:', error);
+    logger.error('❌ Bulk update status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update staff status',

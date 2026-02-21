@@ -1,5 +1,6 @@
 const WaitTimeService = require('../services/waitTimeService');
 const Salon = require('../models/Salon');
+const logger = require('../utils/logger');
 
 /**
  * Emit personalized wait time updates to all users in a salon room
@@ -22,11 +23,11 @@ async function emitWaitTimeUpdate(salonId) {
     const room = global.io.sockets.adapter.rooms.get(roomName);
 
     if (!room || room.size === 0) {
-      console.log(`⚠️ No users connected to salon room: ${roomName}`);
+      logger.info(`⚠️ No users connected to salon room: ${roomName}`);
       return;
     }
 
-    console.log(`🔄 Broadcasting personalized wait times to ${room.size} users in ${roomName}`);
+    logger.info(`🔄 Broadcasting personalized wait times to ${room.size} users in ${roomName}`);
 
     // For each connected socket in this salon's room
     for (const socketId of room) {
@@ -46,11 +47,11 @@ async function emitWaitTimeUpdate(salonId) {
         timestamp: Date.now()
       });
 
-      console.log(`   ✅ Sent to socket ${socketId} (user: ${userId || 'anonymous'}): ${waitTime.displayText}`);
+      logger.info(`   ✅ Sent to socket ${socketId} (user: ${userId || 'anonymous'}): ${waitTime.displayText}`);
     }
 
   } catch (error) {
-    console.error('❌ Error emitting wait time update:', error);
+    logger.error('❌ Error emitting wait time update:', error);
   }
 }
 

@@ -73,7 +73,7 @@ exports.requireSalonAccess = (salonIdParam = 'salonId') => {
         message: 'You do not have access to this salon',
       });
     } catch (error) {
-      console.error('❌ Salon access check error:', error);
+      logger.error('❌ Salon access check error:', error);
       return res.status(500).json({
         success: false,
         message: 'Access verification failed',

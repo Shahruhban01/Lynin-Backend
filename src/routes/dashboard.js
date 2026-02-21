@@ -50,7 +50,7 @@ router.get('/salon/:salonId/today', async (req, res) => {
       allBookings: bookings,
     });
   } catch (error) {
-    console.error('Dashboard error:', error);
+    logger.error('Dashboard error:', error);
     res.status(500).json({ message: error.message });
   }
 });

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const FeatureFlag = require('../models/FeatureFlag');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
 const tawkScript = `<!--Start of Tawk.to Script-->
 <script type="text/javascript">
@@ -19,11 +20,11 @@ s0.parentNode.insertBefore(s1,s0);
 async function fixLiveChat() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    logger.info('✅ Connected to MongoDB');
 
     // Delete existing
     await FeatureFlag.deleteMany({ key: 'liveChatConfig' });
-    console.log('🗑️  Cleared existing config');
+    logger.info('🗑️  Cleared existing config');
 
     // Create new with all fields
     const flag = await FeatureFlag.create({
@@ -35,17 +36,17 @@ async function fixLiveChat() {
       environment: 'all',
     });
 
-    console.log('\n✅ Live chat enabled successfully!');
-    console.log('\n📦 Created Feature Flag:');
-    console.log('   ID:', flag._id);
-    console.log('   Key:', flag.key);
-    console.log('   isLiveChatEnabled:', flag.isLiveChatEnabled);
-    console.log('   tawkToScript length:', flag.tawkToScript?.length || 0);
-    console.log('   isActive:', flag.isActive);
+    logger.info('\n✅ Live chat enabled successfully!');
+    logger.info('\n📦 Created Feature Flag:');
+    logger.info('   ID:', flag._id);
+    logger.info('   Key:', flag.key);
+    logger.info('   isLiveChatEnabled:', flag.isLiveChatEnabled);
+    logger.info('   tawkToScript length:', flag.tawkToScript?.length || 0);
+    logger.info('   isActive:', flag.isActive);
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error:', error);
+    logger.error('❌ Error:', error);
     process.exit(1);
   }
 }

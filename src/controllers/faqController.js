@@ -1,4 +1,5 @@
 const FAQ = require('../models/FAQ');
+const logger = require('../utils/logger');
 
 // In-memory cache
 let faqCache = null;
@@ -20,7 +21,7 @@ exports.getAllFAQs = async (req, res) => {
       !category &&
       !search
     ) {
-      console.log('📦 Serving FAQs from cache');
+      logger.info('📦 Serving FAQs from cache');
       return res.status(200).json({
         success: true,
         cached: true,
@@ -28,7 +29,7 @@ exports.getAllFAQs = async (req, res) => {
       });
     }
 
-    console.log('🔍 Fetching FAQs from database');
+    logger.info('🔍 Fetching FAQs from database');
 
     // Build query
     const query = { isActive: true };
@@ -67,7 +68,7 @@ exports.getAllFAQs = async (req, res) => {
     if (!category && !search) {
       faqCache = categorizedFAQs;
       cacheTimestamp = Date.now();
-      console.log('💾 FAQs cached successfully');
+      logger.info('💾 FAQs cached successfully');
     }
 
     // Set cache headers for CDN
@@ -82,7 +83,7 @@ exports.getAllFAQs = async (req, res) => {
       faqs: categorizedFAQs,
     });
   } catch (error) {
-    console.error('❌ Get FAQs error:', error);
+    logger.error('❌ Get FAQs error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch FAQs',
@@ -105,7 +106,7 @@ exports.incrementView = async (req, res) => {
       message: 'View counted',
     });
   } catch (error) {
-    console.error('❌ Increment view error:', error);
+    logger.error('❌ Increment view error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to increment view',
@@ -132,7 +133,7 @@ exports.submitFeedback = async (req, res) => {
       message: 'Feedback recorded',
     });
   } catch (error) {
-    console.error('❌ Submit feedback error:', error);
+    logger.error('❌ Submit feedback error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to submit feedback',
@@ -156,7 +157,7 @@ exports.createFAQ = async (req, res) => {
       faq,
     });
   } catch (error) {
-    console.error('❌ Create FAQ error:', error);
+    logger.error('❌ Create FAQ error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create FAQ',
@@ -192,7 +193,7 @@ exports.updateFAQ = async (req, res) => {
       faq,
     });
   } catch (error) {
-    console.error('❌ Update FAQ error:', error);
+    logger.error('❌ Update FAQ error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update FAQ',
@@ -224,7 +225,7 @@ exports.deleteFAQ = async (req, res) => {
       message: 'FAQ deleted',
     });
   } catch (error) {
-    console.error('❌ Delete FAQ error:', error);
+    logger.error('❌ Delete FAQ error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete FAQ',
@@ -246,6 +247,7 @@ exports.clearCache = async (req, res) => {
       message: 'FAQ cache cleared',
     });
   } catch (error) {
+    logger.error('❌ Clear cache error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to clear cache',

@@ -1,4 +1,5 @@
 const Booking = require('../models/Booking');
+const logger = require('../utils/logger');
 
 /**
  * Wait Time Calculation Service
@@ -63,7 +64,7 @@ class WaitTimeService {
       // CASE 1: User HAS joined the queue
       // ========================================
       if (userEntry) {
-        console.log(`📊 CASE 1: User ${userId} is in queue at position ${userEntry.queuePosition}`);
+        logger.info(`📊 CASE 1: User ${userId} is in queue at position ${userEntry.queuePosition}`);
 
         // Calculate wait time = sum of durations of ALL entries BEFORE user
         // EXCLUDES: User's own service time + everyone after them
@@ -78,15 +79,15 @@ class WaitTimeService {
             );
             const remainingMinutes = Math.max(0, entry.totalDuration - elapsedMinutes);
             waitMinutes += remainingMinutes;
-            console.log(`   ⏳ Position ${i + 1} (in-progress): ${remainingMinutes} mins remaining`);
+            logger.info(`   ⏳ Position ${i + 1} (in-progress): ${remainingMinutes} mins remaining`);
           } else {
             // For pending services, add FULL duration
             waitMinutes += entry.totalDuration;
-            console.log(`   ⏳ Position ${i + 1} (pending): ${entry.totalDuration} mins`);
+            logger.info(`   ⏳ Position ${i + 1} (pending): ${entry.totalDuration} mins`);
           }
         }
 
-        console.log(`   ✅ Total wait for user: ${waitMinutes} mins`);
+        logger.info(`   ✅ Total wait for user: ${waitMinutes} mins`);
 
         return {
           waitMinutes: Math.max(0, waitMinutes),
@@ -103,7 +104,7 @@ class WaitTimeService {
       // ========================================
       // CASE 2: User has NOT joined the queue
       // ========================================
-      console.log(`📊 CASE 2: User ${userId || 'anonymous'} not in queue - calculating total wait`);
+      logger.info(`📊 CASE 2: User ${userId || 'anonymous'} not in queue - calculating total wait`);
 
       // Calculate total wait time if they join RIGHT NOW
       for (const entry of queueEntries) {
@@ -120,7 +121,7 @@ class WaitTimeService {
         }
       }
 
-      console.log(`   ✅ Total queue wait: ${waitMinutes} mins (${queueLength} people)`);
+      logger.info(`   ✅ Total queue wait: ${waitMinutes} mins (${queueLength} people)`);
 
       // Check salon-specific conditions
       if (salon) {
@@ -170,7 +171,7 @@ class WaitTimeService {
       };
 
     } catch (error) {
-      console.error('❌ Wait time calculation error:', error);
+      logger.error('❌ Wait time calculation error:', error);
       return {
         waitMinutes: null,
         displayText: 'Wait unavailable',

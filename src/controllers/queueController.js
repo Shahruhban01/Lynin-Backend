@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Salon = require('../models/Salon');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 const {
   addWalkInCustomer,
   startService,
@@ -28,7 +29,7 @@ exports.getQueueBySalon = async (req, res) => {
       .sort({ queuePosition: 1 })
       .lean();
 
-    console.log(`📋 Queue fetched for salon ${salonId}: ${queue.length} items`);
+    logger.info(`📋 Queue fetched for salon ${salonId}: ${queue.length} items`);
 
     res.status(200).json({
       success: true,
@@ -70,7 +71,7 @@ exports.getQueueBySalon = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get queue error:', error);
+    logger.error('❌ Get queue error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch queue',
@@ -123,7 +124,7 @@ exports.addWalkInToQueue = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Add walk-in error:', error);
+    logger.error('❌ Add walk-in error:', error);
 
     res.status(400).json({
       success: false,
@@ -148,7 +149,7 @@ exports.markCustomerArrived = async (req, res) => {
       phoneLastFour
     );
 
-    console.log(`✅ Customer arrived: Booking ${booking._id}`);
+    logger.info(`✅ Customer arrived: Booking ${booking._id}`);
 
     // Emit socket
     if (global.io) {
@@ -175,7 +176,7 @@ exports.markCustomerArrived = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Mark arrived error:', error);
+    logger.error('❌ Mark arrived error:', error);
 
     res.status(400).json({
       success: false,
@@ -219,7 +220,7 @@ exports.startService = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Start service error:', error);
+    logger.error('❌ Start service error:', error);
 
     res.status(400).json({
       success: false,
@@ -271,7 +272,7 @@ exports.completeService = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Complete service error:', error);
+    logger.error('❌ Complete service error:', error);
 
     res.status(400).json({
       success: false,
@@ -308,9 +309,9 @@ exports.skipCustomer = async (req, res) => {
       reason
     );
 
-    console.log(`⏭️ Customer skipped: ${bookingId}`);
-    console.log(`   ${originalPosition} → ${newPosition}`);
-    console.log(`   Reason: ${reason}`);
+    logger.info(`⏭️ Customer skipped: ${bookingId}`);
+    logger.info(`   ${originalPosition} → ${newPosition}`);
+    logger.info(`   Reason: ${reason}`);
 
     // Emit socket
     if (global.io) {
@@ -338,7 +339,7 @@ exports.skipCustomer = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Skip customer error:', error);
+    logger.error('❌ Skip customer error:', error);
 
     res.status(400).json({
       success: false,
@@ -364,7 +365,7 @@ exports.undoSkip = async (req, res) => {
       originalPosition
     );
 
-    console.log(`↩️ Undo skip: ${booking._id}`);
+    logger.info(`↩️ Undo skip: ${booking._id}`);
 
     // Socket
     if (global.io) {
@@ -391,7 +392,7 @@ exports.undoSkip = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Undo skip error:', error);
+    logger.error('❌ Undo skip error:', error);
 
     res.status(400).json({
       success: false,
@@ -430,7 +431,7 @@ exports.cancelBooking = async (req, res) => {
     booking.cancellationReason = reason;
     await booking.save();
 
-    console.log(`❌ Booking cancelled: ${bookingId} - Reason: ${reason}`);
+    logger.info(`❌ Booking cancelled: ${bookingId} - Reason: ${reason}`);
 
     await _reorderQueuePositions(salonId);
 
@@ -453,7 +454,7 @@ exports.cancelBooking = async (req, res) => {
       message: 'Booking cancelled',
     });
   } catch (error) {
-    console.error('❌ Cancel booking error:', error);
+    logger.error('❌ Cancel booking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to cancel booking',
@@ -474,7 +475,7 @@ async function _reorderQueuePositions(salonId) {
     await activeBookings[i].save();
   }
 
-  console.log(`🔄 Queue reordered for salon ${salonId}: ${activeBookings.length} positions`);
+  logger.info(`🔄 Queue reordered for salon ${salonId}: ${activeBookings.length} positions`);
 }
 
 // ✅ REPLACE THE PLACEHOLDER FUNCTIONS WITH THESE:
@@ -506,7 +507,7 @@ exports.getPriorityCount = async (req, res) => {
       canUse: salon.priorityUsedToday < salon.priorityLimitPerDay,
     });
   } catch (error) {
-    console.error('❌ Get priority count error:', error);
+    logger.error('❌ Get priority count error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch priority count',
@@ -537,7 +538,7 @@ exports.startPriorityService = async (req, res) => {
       userSalonRole: req.userSalonRole,
     });
 
-    console.log(`⚡ Priority started: ${booking._id}`);
+    logger.info(`⚡ Priority started: ${booking._id}`);
 
     // Socket
     if (global.io) {
@@ -588,7 +589,7 @@ exports.startPriorityService = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Priority start error:', error);
+    logger.error('❌ Priority start error:', error);
 
     res.status(400).json({
       success: false,

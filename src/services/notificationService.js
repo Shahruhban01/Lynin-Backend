@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const logger = require('../utils/logger');
 
 class NotificationService {
   // Send notification to specific device
@@ -22,10 +23,10 @@ class NotificationService {
       };
 
       const response = await admin.messaging().send(message);
-      console.log(`✅ Notification sent: ${response}`);
+      logger.info(`✅ Notification sent: ${response}`);
       return response;
     } catch (error) {
-      console.error('❌ Notification error:', error);
+      logger.error('❌ Notification error:', error);
       throw error;
     }
   }
@@ -43,10 +44,10 @@ class NotificationService {
       };
 
       const response = await admin.messaging().sendMulticast(message);
-      console.log(`✅ Sent ${response.successCount} notifications`);
+      logger.info(`✅ Sent ${response.successCount} notifications`);
       return response;
     } catch (error) {
-      console.error('❌ Multicast notification error:', error);
+      logger.error('❌ Multicast notification error:', error);
       throw error;
     }
   }
@@ -54,7 +55,7 @@ class NotificationService {
   // ✅ NEW: Send new booking notification to salon owner
   static async notifyNewBooking(owner, booking, customer, salon) {
     if (!owner.fcmToken) {
-      console.log('⚠️ Owner FCM token not found');
+      logger.info('⚠️ Owner FCM token not found');
       return;
     }
 
@@ -72,7 +73,7 @@ class NotificationService {
       },
     });
 
-    console.log(`✅ New booking notification sent to owner: ${owner.name}`);
+    logger.info(`✅ New booking notification sent to owner: ${owner.name}`);
   }
 
   // Queue position update notification
@@ -142,7 +143,7 @@ static async notifyPriorityStarted(user, booking, salon, reason) {
     },
   });
 
-  console.log(`✅ Priority notification sent to user ${user._id}`);
+  logger.info(`✅ Priority notification sent to user ${user._id}`);
 }
 
 
@@ -194,9 +195,9 @@ static async notifyPriorityStarted(user, booking, salon, reason) {
         },
       });
 
-      console.log(`✅ Turn approaching notification sent to user ${user._id}`);
+      logger.info(`✅ Turn approaching notification sent to user ${user._id}`);
     } catch (error) {
-      console.error('❌ Reminder notification error:', error);
+      logger.error('❌ Reminder notification error:', error);
     }
   }
 
@@ -218,9 +219,9 @@ static async notifyPriorityStarted(user, booking, salon, reason) {
         },
       });
 
-      console.log(`✅ Booking reminder sent to user ${user._id}`);
+      logger.info(`✅ Booking reminder sent to user ${user._id}`);
     } catch (error) {
-      console.error('❌ Booking reminder error:', error);
+      logger.error('❌ Booking reminder error:', error);
     }
   }
 
@@ -228,7 +229,7 @@ static async notifyPriorityStarted(user, booking, salon, reason) {
   static async notifySalonClosed(customer, salon, reason) {
   try {
     if (!customer.fcmToken) {
-      console.log(`⚠️ No FCM token for customer: ${customer.name}`);
+      logger.info(`⚠️ No FCM token for customer: ${customer.name}`);
       return;
     }
 
@@ -248,11 +249,11 @@ static async notifyPriorityStarted(user, booking, salon, reason) {
     };
 
     const response = await admin.messaging().send(message);
-    console.log(`✅ Salon closure notification sent to: ${customer.name}`, response);
+    logger.info(`✅ Salon closure notification sent to: ${customer.name}`, response);
 
     return response;
   } catch (error) {
-    console.error('❌ Salon closure notification error:', error);
+    logger.error('❌ Salon closure notification error:', error);
     throw error;
   }
 };

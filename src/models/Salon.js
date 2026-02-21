@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const logger = require('../utils/logger');
 
 const salonSchema = new mongoose.Schema(
   {
@@ -284,7 +285,7 @@ salonSchema.methods.resetPriorityIfNeeded = async function() {
     this.priorityUsedToday = 0;
     this.lastPriorityReset = now;
     await this.save();
-    console.log(`✅ Priority count reset for salon ${this._id}`);
+    logger.info(`✅ Priority count reset for salon ${this._id}`);
     return true;
   }
   return false;

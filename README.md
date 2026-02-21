@@ -627,9 +627,9 @@ const connectDB = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log('✅ MongoDB Connected');
+    logger.info('✅ MongoDB Connected');
   } catch (error) {
-    console.error('❌ MongoDB Connection Error:', error.message);
+    logger.error('❌ MongoDB Connection Error:', error.message);
     process.exit(1);
   }
 };
@@ -951,7 +951,7 @@ const socket = io('http://localhost:3000', {
 });
 
 socket.on('connect', () => {
-  console.log('Connected to server');
+  logger.info('Connected to server');
   
   // Join salon room to receive updates
   socket.emit('join_salon', { salonId: '60d5f484...' });
@@ -978,7 +978,7 @@ socket.on('connect', () => {
 ```javascript
 // Server broadcasts personalized wait time to each socket
 socket.on('wait_time_updated', (data) => {
-  console.log(data);
+  logger.info(data);
   /*
   {
     salonId: "60d5f484...",

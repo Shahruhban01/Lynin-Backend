@@ -2,6 +2,7 @@ const admin = require('firebase-admin');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const AdminAuditLog = require('../models/AdminAuditLog');
+const logger = require('../utils/logger');
 
 // Generate JWT Token for Admin
 const generateAdminToken = (userId) => {
@@ -19,9 +20,9 @@ exports.adminLogin = async (req, res) => {
   try {
     const { email, firebaseToken } = req.body;
 
-    console.log('🔐 Admin Login Attempt:');
-    console.log('  Email:', email);
-    console.log('  Token:', firebaseToken ? `${firebaseToken.substring(0, 20)}...` : 'undefined');
+    logger.info('🔐 Admin Login Attempt:');
+    logger.info('  Email:', email);
+    logger.info('  Token:', firebaseToken ? `${firebaseToken.substring(0, 20)}...` : 'undefined');
 
     // Validation
     if (!email || !firebaseToken) {
@@ -35,9 +36,9 @@ exports.adminLogin = async (req, res) => {
     let decodedToken;
     try {
       decodedToken = await admin.auth().verifyIdToken(firebaseToken);
-      console.log('✅ Firebase token verified for UID:', decodedToken.uid);
+      logger.info('✅ Firebase token verified for UID:', decodedToken.uid);
     } catch (error) {
-      console.error('❌ Firebase verification failed:', error.message);
+      logger.error('❌ Firebase verification failed:', error.message);
       return res.status(401).json({
         success: false,
         message: 'Invalid Firebase token',
@@ -49,7 +50,7 @@ exports.adminLogin = async (req, res) => {
 
     // Verify email matches token
     if (tokenEmail?.toLowerCase() !== email.toLowerCase()) {
-      console.error('❌ Email mismatch');
+      logger.error('❌ Email mismatch');
       return res.status(401).json({
         success: false,
         message: 'Email does not match Firebase token',
@@ -64,7 +65,7 @@ exports.adminLogin = async (req, res) => {
     });
 
     if (!user) {
-      console.error('❌ Admin login failed: User not found or not admin');
+      logger.error('❌ Admin login failed: User not found or not admin');
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials or insufficient permissions',
@@ -94,7 +95,7 @@ exports.adminLogin = async (req, res) => {
       userAgent: req.get('user-agent'),
     });
 
-    console.log('✅ Admin logged in:', user.email);
+    logger.info('✅ Admin logged in:', user.email);
 
     res.status(200).json({
       success: true,
@@ -109,7 +110,7 @@ exports.adminLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Admin login error:', error);
+    logger.error('❌ Admin login error:', error);
     res.status(500).json({
       success: false,
       message: 'Login failed. Please try again.',
@@ -155,7 +156,7 @@ exports.getAdminProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get admin profile error:', error);
+    logger.error('❌ Get admin profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch profile',
@@ -180,14 +181,14 @@ exports.adminLogout = async (req, res) => {
       userAgent: req.get('user-agent'),
     });
 
-    console.log('✅ Admin logged out:', req.user.email);
+    logger.info('✅ Admin logged out:', req.user.email);
 
     res.status(200).json({
       success: true,
       message: 'Logged out successfully',
     });
   } catch (error) {
-    console.error('❌ Admin logout error:', error);
+    logger.error('❌ Admin logout error:', error);
     res.status(500).json({
       success: false,
       message: 'Logout failed',
@@ -231,7 +232,7 @@ exports.updateAdminProfile = async (req, res) => {
       userAgent: req.get('user-agent'),
     });
 
-    console.log('✅ Admin profile updated:', user.email);
+    logger.info('✅ Admin profile updated:', user.email);
 
     res.status(200).json({
       success: true,
@@ -246,7 +247,7 @@ exports.updateAdminProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Admin profile update error:', error);
+    logger.error('❌ Admin profile update error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update profile',

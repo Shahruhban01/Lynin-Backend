@@ -4,6 +4,7 @@ const { syncStaffCounts } = require('../utils/staffSync');
 const WaitTimeService = require('../services/waitTimeService');
 const { attachWaitTimesToSalons } = require('../utils/waitTimeHelpers');
 const NotificationService = require('../services/notificationService');
+const logger = require('../utils/logger');
 
 
 // ✅ NEW: Close salon with reason and queue check
@@ -44,7 +45,7 @@ exports.closeSalonWithReason = async (req, res) => {
       status: { $in: ['pending', 'in-progress'] },
     });
 
-    console.log(`🔍 Queue check: ${activeBookings} active bookings`);
+    logger.info(`🔍 Queue check: ${activeBookings} active bookings`);
 
     // Get all customers in queue for notifications
     const queueCustomers = await Booking.find({
@@ -72,13 +73,13 @@ exports.closeSalonWithReason = async (req, res) => {
 
     await salon.save();
 
-    console.log(`🔒 Salon closed: ${salon.name}`);
-    console.log(`   Reason: ${salon.lastClosureReason}`);
-    console.log(`   Queue size at closure: ${activeBookings}`);
+    logger.info(`🔒 Salon closed: ${salon.name}`);
+    logger.info(`   Reason: ${salon.lastClosureReason}`);
+    logger.info(`   Queue size at closure: ${activeBookings}`);
 
     // ✅ Send notifications to all customers in queue
     if (queueCustomers.length > 0) {
-      console.log(`📤 Notifying ${queueCustomers.length} customers about closure`);
+      logger.info(`📤 Notifying ${queueCustomers.length} customers about closure`);
 
       for (const booking of queueCustomers) {
         if (booking.userId && booking.userId.fcmToken) {
@@ -89,7 +90,7 @@ exports.closeSalonWithReason = async (req, res) => {
               salon.lastClosureReason
             );
           } catch (notifError) {
-            console.error(
+            logger.error(
               `❌ Failed to notify customer ${booking.userId.name}:`,
               notifError
             );
@@ -97,7 +98,7 @@ exports.closeSalonWithReason = async (req, res) => {
         }
       }
 
-      console.log(`✅ Closure notifications sent`);
+      logger.info(`✅ Closure notifications sent`);
     }
 
     // Emit socket event
@@ -127,7 +128,7 @@ exports.closeSalonWithReason = async (req, res) => {
       notificationsSent: queueCustomers.length,
     });
   } catch (error) {
-    console.error('❌ Close salon error:', error);
+    logger.error('❌ Close salon error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to close salon',
@@ -197,7 +198,7 @@ exports.getQueueStatusForClosure = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get queue status error:', error);
+    logger.error('❌ Get queue status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get queue status',
@@ -246,7 +247,7 @@ exports.setBusyMode = async (req, res) => {
 
     await salon.save();
 
-    console.log(`${enabled ? '⏸️' : '▶️'} Busy mode ${enabled ? 'ENABLED' : 'DISABLED'} for: ${salon.name}`);
+    logger.info(`${enabled ? '⏸️' : '▶️'} Busy mode ${enabled ? 'ENABLED' : 'DISABLED'} for: ${salon.name}`);
 
     // Emit socket event
     if (global.io) {
@@ -267,7 +268,7 @@ exports.setBusyMode = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Set busy mode error:', error);
+    logger.error('❌ Set busy mode error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to set busy mode',
@@ -297,7 +298,7 @@ exports.getSalons = async (req, res) => {
       salons: salonsWithWaitTime,
     });
   } catch (error) {
-    console.error('❌ Get salons error:', error);
+    logger.error('❌ Get salons error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get salons',
@@ -361,7 +362,7 @@ exports.getSalonById = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get salon error:', error);
+    logger.error('❌ Get salon error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch salon',
@@ -425,7 +426,7 @@ exports.getNearbySalons = async (req, res) => {
       salons: salonsWithWaitTime,
     });
   } catch (error) {
-    console.error('❌ Get nearby salons error:', error);
+    logger.error('❌ Get nearby salons error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch nearby salons',
@@ -503,7 +504,7 @@ exports.createSalon = async (req, res) => {
     user.role = 'owner'; // enforce
     await user.save();
 
-    console.log(`✅ Salon created & linked: ${salon.name} → User ${user._id}`);
+    logger.info(`✅ Salon created & linked: ${salon.name} → User ${user._id}`);
 
     // 3️⃣ Return salon explicitly
     res.status(201).json({
@@ -515,7 +516,7 @@ exports.createSalon = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Create salon error:', error);
+    logger.error('❌ Create salon error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create salon',
@@ -563,7 +564,7 @@ exports.createSalon = async (req, res) => {
 //       averageServiceDuration: averageServiceDuration || 30,
 //     });
 
-//     console.log(`✅ Salon created: ${salon.name}`);
+//     logger.info(`✅ Salon created: ${salon.name}`);
 
 //     res.status(201).json({
 //       success: true,
@@ -571,7 +572,7 @@ exports.createSalon = async (req, res) => {
 //       salon,
 //     });
 //   } catch (error) {
-//     console.error('❌ Create salon error:', error);
+//     logger.error('❌ Create salon error:', error);
 //     res.status(500).json({
 //       success: false,
 //       message: 'Failed to create salon',
@@ -606,14 +607,14 @@ function toRad(deg) {
 // @access  Private
 exports.getMySalons = async (req, res) => {
   try {
-    console.log('📍 Fetching salons for user:', req.user._id);
+    logger.info('📍 Fetching salons for user:', req.user._id);
 
     const salons = await Salon.find({
       ownerId: req.user._id,
       isActive: true,
     }).select('-__v');
 
-    console.log(`✅ Found ${salons.length} salons for user`);
+    logger.info(`✅ Found ${salons.length} salons for user`);
 
     res.status(200).json({
       success: true,
@@ -621,7 +622,7 @@ exports.getMySalons = async (req, res) => {
       salons,
     });
   } catch (error) {
-    console.error('❌ Get my salons error:', error);
+    logger.error('❌ Get my salons error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch salons',
@@ -675,9 +676,9 @@ exports.updateSalon = async (req, res) => {
     // ✅ NEW: Only allow location update if admin enabled it
     if (salon.locationEditEnabled) {
       allowedUpdates.push('location');
-      console.log('✅ Location edit enabled for this salon');
+      logger.info('✅ Location edit enabled for this salon');
     } else if (req.body.location) {
-      console.log('⚠️ Location edit attempted but not enabled');
+      logger.info('⚠️ Location edit attempted but not enabled');
       return res.status(403).json({
         success: false,
         message: 'Location editing is disabled. Please contact support to enable it.',
@@ -692,9 +693,9 @@ exports.updateSalon = async (req, res) => {
 
     await salon.save();
 
-    console.log(`✅ Salon updated: ${salon.name}`);
+    logger.info(`✅ Salon updated: ${salon.name}`);
     if (req.body.type) {
-      console.log(`   Type changed to: ${req.body.type || 'Not specified'}`);
+      logger.info(`   Type changed to: ${req.body.type || 'Not specified'}`);
     }
 
     // Emit wait time update
@@ -718,7 +719,7 @@ exports.updateSalon = async (req, res) => {
       salon,
     });
   } catch (error) {
-    console.error('❌ Update salon error:', error);
+    logger.error('❌ Update salon error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update salon',
@@ -753,7 +754,7 @@ exports.toggleLocationEdit = async (req, res) => {
     salon.locationEditEnabled = !salon.locationEditEnabled;
     await salon.save();
 
-    console.log(
+    logger.info(
       `✅ Location edit ${salon.locationEditEnabled ? 'ENABLED' : 'DISABLED'} for salon: ${salon.name}`
     );
 
@@ -763,7 +764,7 @@ exports.toggleLocationEdit = async (req, res) => {
       locationEditEnabled: salon.locationEditEnabled,
     });
   } catch (error) {
-    console.error('❌ Toggle location edit error:', error);
+    logger.error('❌ Toggle location edit error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to toggle location edit',
@@ -809,7 +810,7 @@ exports.toggleBusyMode = async (req, res) => {
       salon,
     });
   } catch (error) {
-    console.error('❌ Toggle busy mode error:', error);
+    logger.error('❌ Toggle busy mode error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to toggle busy mode',
@@ -862,7 +863,7 @@ exports.updateActiveBarbers = async (req, res) => {
       salon,
     });
   } catch (error) {
-    console.error('❌ Update active barbers error:', error);
+    logger.error('❌ Update active barbers error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update active barbers',
@@ -892,7 +893,7 @@ exports.toggleSalonStatus = async (req, res) => {
     salon.isActive = !salon.isActive;
     await salon.save();
 
-    console.log(`✅ Salon status toggled: ${salon.name} - ${salon.isActive ? 'OPEN' : 'CLOSED'}`);
+    logger.info(`✅ Salon status toggled: ${salon.name} - ${salon.isActive ? 'OPEN' : 'CLOSED'}`);
 
     res.status(200).json({
       success: true,
@@ -900,7 +901,7 @@ exports.toggleSalonStatus = async (req, res) => {
       isActive: salon.isActive,
     });
   } catch (error) {
-    console.error('❌ Toggle salon status error:', error);
+    logger.error('❌ Toggle salon status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to toggle salon status',
@@ -969,10 +970,10 @@ exports.toggleStaffSystem = async (req, res) => {
     const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
     await emitWaitTimeUpdate(salon._id);
 
-    console.log(
+    logger.info(
       `✅ Staff system ${salon.staffSystemEnabled ? 'ENABLED' : 'DISABLED'} for ${salon.name}`
     );
-    console.log(`👥 Total: ${staffStats.total}, Active: ${staffStats.active}`);
+    logger.info(`👥 Total: ${staffStats.total}, Active: ${staffStats.active}`);
 
     res.status(200).json({
       success: true,
@@ -984,7 +985,7 @@ exports.toggleStaffSystem = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Toggle staff system error:', error);
+    logger.error('❌ Toggle staff system error:', error);
 
     res.status(500).json({
       success: false,
@@ -1031,7 +1032,7 @@ exports.updateStaffSystemStatus = async (req, res) => {
     salon.staffSystemEnabled = enabled;
     await salon.save();
 
-    console.log(
+    logger.info(
       `✅ Staff system set to ${enabled ? 'ENABLED' : 'DISABLED'} for salon: ${salon.name}`
     );
 
@@ -1041,7 +1042,7 @@ exports.updateStaffSystemStatus = async (req, res) => {
       staffSystemEnabled: salon.staffSystemEnabled,
     });
   } catch (error) {
-    console.error('❌ Update staff system error:', error);
+    logger.error('❌ Update staff system error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update staff system',
@@ -1100,10 +1101,10 @@ exports.updateSalonSettings = async (req, res) => {
 
     await salon.save();
 
-    console.log(`✅ Settings updated for salon: ${salon.name}`);
-    console.log(`   Operating mode: ${salon.operatingMode}`);
-    console.log(`   isOpen: ${salon.isOpen}, isActive: ${salon.isActive}`);
-    console.log(`   Auto-accept: ${salon.autoAcceptBookings}`);
+    logger.info(`✅ Settings updated for salon: ${salon.name}`);
+    logger.info(`   Operating mode: ${salon.operatingMode}`);
+    logger.info(`   isOpen: ${salon.isOpen}, isActive: ${salon.isActive}`);
+    logger.info(`   Auto-accept: ${salon.autoAcceptBookings}`);
 
     // Emit wait time update
     const { emitWaitTimeUpdate } = require('../utils/waitTimeHelpers');
@@ -1115,7 +1116,7 @@ exports.updateSalonSettings = async (req, res) => {
       salon,
     });
   } catch (error) {
-    console.error('❌ Update settings error:', error);
+    logger.error('❌ Update settings error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update settings',
@@ -1151,7 +1152,7 @@ exports.togglePhoneChangePermission = async (req, res) => {
     salon.phoneChangeEnabled = !salon.phoneChangeEnabled;
     await salon.save();
 
-    console.log(
+    logger.info(
       `✅ Phone change ${salon.phoneChangeEnabled ? 'ENABLED' : 'DISABLED'} for salon: ${salon.name}`
     );
 
@@ -1161,7 +1162,7 @@ exports.togglePhoneChangePermission = async (req, res) => {
       phoneChangeEnabled: salon.phoneChangeEnabled,
     });
   } catch (error) {
-    console.error('❌ Toggle phone change error:', error);
+    logger.error('❌ Toggle phone change error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to toggle phone change permission',
@@ -1251,7 +1252,7 @@ exports.addService = async (req, res) => {
     salon.services.push(newService);
     await salon.save();
 
-    console.log(`✅ Service added: ${name} to ${salon.name}`);
+    logger.info(`✅ Service added: ${name} to ${salon.name}`);
 
     res.status(201).json({
       success: true,
@@ -1260,7 +1261,7 @@ exports.addService = async (req, res) => {
       salon,
     });
   } catch (error) {
-    console.error('❌ Add service error:', error);
+    logger.error('❌ Add service error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to add service',
@@ -1353,7 +1354,7 @@ exports.updateService = async (req, res) => {
 
     await salon.save();
 
-    console.log(`✅ Service updated: ${service.name} in ${salon.name}`);
+    logger.info(`✅ Service updated: ${service.name} in ${salon.name}`);
 
     res.status(200).json({
       success: true,
@@ -1362,7 +1363,7 @@ exports.updateService = async (req, res) => {
       salon,
     });
   } catch (error) {
-    console.error('❌ Update service error:', error);
+    logger.error('❌ Update service error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update service',
@@ -1409,7 +1410,7 @@ exports.deleteService = async (req, res) => {
     service.deleteOne();
     await salon.save();
 
-    console.log(`✅ Service deleted: ${serviceName} from ${salon.name}`);
+    logger.info(`✅ Service deleted: ${serviceName} from ${salon.name}`);
 
     res.status(200).json({
       success: true,
@@ -1417,7 +1418,7 @@ exports.deleteService = async (req, res) => {
       salon,
     });
   } catch (error) {
-    console.error('❌ Delete service error:', error);
+    logger.error('❌ Delete service error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete service',
@@ -1458,7 +1459,7 @@ exports.getPriorityCount = async (req, res) => {
       canUse: salon.priorityUsedToday < salon.priorityLimitPerDay,
     });
   } catch (error) {
-    console.error('❌ Get priority count error:', error);
+    logger.error('❌ Get priority count error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch priority count',

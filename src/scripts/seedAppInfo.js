@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const AppInfo = require('../models/AppInfo');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
 const appInfoData = {
   appName: 'Lynin',
@@ -53,17 +54,17 @@ const appInfoData = {
 async function seed() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    logger.info('✅ Connected to MongoDB');
 
     await AppInfo.deleteMany({});
-    console.log('🗑️  Cleared existing app info');
+    logger.info('🗑️  Cleared existing app info');
 
     await AppInfo.create(appInfoData);
-    console.log('✅ Seeded app info');
+    logger.info('✅ Seeded app info');
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Seed error:', error);
+    logger.error('❌ Seed error:', error);
     process.exit(1);
   }
 }

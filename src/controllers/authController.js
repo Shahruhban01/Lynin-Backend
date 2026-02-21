@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { verifyFirebaseToken } = require('../config/firebase');
 const generateToken = require('../utils/generateToken');
+const logger = require('../utils/logger');
 
 // // @desc    Verify Firebase token and create/update user
 // // @route   POST /api/auth/verify-token
@@ -13,13 +14,13 @@ const generateToken = require('../utils/generateToken');
 //     const { idToken, firebaseToken, phone } = req.body;
 //     const token = idToken || firebaseToken;
 
-//     console.log('📥 Verify Token Request:');
-//     console.log('  Phone:', phone);
-//     console.log('  Token:', token ? `${token.substring(0, 20)}...` : 'undefined');
+//     logger.info('📥 Verify Token Request:');
+//     logger.info('  Phone:', phone);
+//     logger.info('  Token:', token ? `${token.substring(0, 20)}...` : 'undefined');
 
 //     // Validate token
 //     if (!token) {
-//       console.error('❌ No token provided');
+//       logger.error('❌ No token provided');
 //       return res.status(400).json({
 //         success: false,
 //         message: 'Firebase token is required',
@@ -30,9 +31,9 @@ const generateToken = require('../utils/generateToken');
 //     let decodedToken;
 //     try {
 //       decodedToken = await admin.auth().verifyIdToken(token);
-//       console.log('✅ Firebase token verified for UID:', decodedToken.uid);
+//       logger.info('✅ Firebase token verified for UID:', decodedToken.uid);
 //     } catch (error) {
-//       console.error('❌ Firebase verification failed:', error.message);
+//       logger.error('❌ Firebase verification failed:', error.message);
 //       return res.status(401).json({
 //         success: false,
 //         message: 'Invalid Firebase token',
@@ -43,10 +44,10 @@ const generateToken = require('../utils/generateToken');
 //     // Use phone from request body OR from Firebase token
 //     const userPhone = phone || decodedToken.phone_number;
 
-//     console.log('📱 Using phone:', userPhone);
+//     logger.info('📱 Using phone:', userPhone);
 
 //     if (!userPhone) {
-//       console.error('❌ No phone number available');
+//       logger.error('❌ No phone number available');
 //       return res.status(400).json({
 //         success: false,
 //         message: 'Phone number is required',
@@ -57,14 +58,14 @@ const generateToken = require('../utils/generateToken');
 //     let user = await User.findOne({ firebaseUid: uid });
 
 //     if (!user) {
-//       console.log('📝 Creating new user...');
+//       logger.info('📝 Creating new user...');
 //       user = await User.create({
 //         phone: userPhone,
 //         firebaseUid: uid,
 //       });
-//       console.log('✅ New user created:', user._id);
+//       logger.info('✅ New user created:', user._id);
 //     } else {
-//       console.log('✅ Existing user found:', user._id);
+//       logger.info('✅ Existing user found:', user._id);
 //       user.lastLogin = Date.now();
 //       await user.save();
 //     }
@@ -76,7 +77,7 @@ const generateToken = require('../utils/generateToken');
 //       { expiresIn: '30d' }
 //     );
 
-//     console.log('✅ JWT generated for user:', user._id);
+//     logger.info('✅ JWT generated for user:', user._id);
 
 //     res.status(200).json({
 //       success: true,
@@ -90,7 +91,7 @@ const generateToken = require('../utils/generateToken');
 //       },
 //     });
 //   } catch (error) {
-//     console.error('❌ Verify token error:', error);
+//     logger.error('❌ Verify token error:', error);
 //     res.status(500).json({
 //       success: false,
 //       message: 'Authentication failed',
@@ -107,13 +108,16 @@ exports.verifyToken = async (req, res) => {
     const { idToken, firebaseToken, phone, appType } = req.body;
     const token = idToken || firebaseToken;
 
-    console.log('📥 Verify Token Request:');
-    console.log('  Phone:', phone);
-    console.log('  AppType:', appType); // 'customer' or 'salon'
-    console.log('  Token:', token ? `${token.substring(0, 20)}...` : 'undefined');
+    logger.info('📥 Verify Token Request:');
+    logger.info('  Phone:', phone);
+    logger.info('  AppType:', appType); // 'customer' or 'salon'
+    logger.info('  Token:', token ? `${token.substring(0, 20)}...` : 'undefined');
+
+    
+
 
     if (!token) {
-      console.error('❌ No token provided');
+      logger.error('❌ No token provided');
       return res.status(400).json({
         success: false,
         message: 'Firebase token is required',
@@ -124,9 +128,9 @@ exports.verifyToken = async (req, res) => {
     let decodedToken;
     try {
       decodedToken = await admin.auth().verifyIdToken(token);
-      console.log('✅ Firebase token verified for UID:', decodedToken.uid);
+      logger.info('✅ Firebase token verified for UID:', decodedToken.uid);
     } catch (error) {
-      console.error('❌ Firebase verification failed:', error.message);
+      logger.error('❌ Firebase verification failed:', error.message);
       return res.status(401).json({
         success: false,
         message: 'Invalid Firebase token',
@@ -136,10 +140,10 @@ exports.verifyToken = async (req, res) => {
     const uid = decodedToken.uid;
     const userPhone = phone || decodedToken.phone_number;
 
-    console.log('📱 Using phone:', userPhone);
+    logger.info('📱 Using phone:', userPhone);
 
     if (!userPhone) {
-      console.error('❌ No phone number available');
+      logger.error('❌ No phone number available');
       return res.status(400).json({
         success: false,
         message: 'Phone number is required',
@@ -151,7 +155,7 @@ exports.verifyToken = async (req, res) => {
     let user = await User.findOne({ firebaseUid: uid }).populate('salonId', 'name isActive');
 
     if (!user) {
-      console.log('📝 Creating new user...');
+      logger.info('📝 Creating new user...');
 
       // ✅ NEW: Check if a walk-in user exists with this phone
       if (userPhone) {
@@ -173,7 +177,7 @@ exports.verifyToken = async (req, res) => {
           await walkInUser.save();
           user = walkInUser;
 
-          console.log(`✅ Linked walk-in account to Firebase user: ${userPhone}`);
+          logger.info(`✅ Linked walk-in account to Firebase user: ${userPhone}`);
         }
       }
 
@@ -187,10 +191,10 @@ exports.verifyToken = async (req, res) => {
           role: defaultRole,
         });
 
-        console.log(`✅ New user created with role: ${defaultRole}`);
+        logger.info(`✅ New user created with role: ${defaultRole}`);
       }
     } else {
-      console.log('✅ Existing user found:', user._id, 'Role:', user.role);
+      logger.info('✅ Existing user found:', user._id, 'Role:', user.role);
       user.lastLogin = Date.now();
       await user.save();
     }
@@ -210,7 +214,7 @@ exports.verifyToken = async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    console.log('✅ JWT generated for user:', user._id, 'Role:', user.role);
+    logger.info('✅ JWT generated for user:', user._id, 'Role:', user.role);
 
     // Prepare response
     const response = {
@@ -242,7 +246,7 @@ exports.verifyToken = async (req, res) => {
 
     res.status(200).json(response);
   } catch (error) {
-    console.error('❌ Verify token error:', error);
+    logger.error('❌ Verify token error:', error);
     res.status(500).json({
       success: false,
       message: 'Authentication failed',
@@ -290,7 +294,7 @@ exports.updateProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Profile update error:', error);
+    logger.error('❌ Profile update error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update profile',
@@ -319,7 +323,7 @@ exports.getMe = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get user error:', error);
+    logger.error('❌ Get user error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get user profile',
@@ -360,7 +364,7 @@ exports.getProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Get profile error:', error);
+    logger.error('❌ Get profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get profile',
@@ -416,7 +420,7 @@ exports.updateUserProfile = async (req, res) => {
 
     await user.save();
 
-    console.log(`✅ Profile updated for user: ${user.phone}`);
+    logger.info (`✅ Profile updated for user: ${user.phone}`);
 
     res.status(200).json({
       success: true,
@@ -433,7 +437,7 @@ exports.updateUserProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Profile update error:', error);
+    logger.error('❌ Profile update error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update profile',
@@ -451,13 +455,13 @@ exports.updateFcmToken = async (req, res) => {
   try {
     const { fcmToken } = req.body;
 
-    console.log('📲 FCM Token Update Request:');
-    console.log('   User ID:', req.user._id);
-    console.log('   User Role:', req.user.role);
-    console.log('   FCM Token:', fcmToken ? `${fcmToken.substring(0, 20)}...` : 'null');
+    logger.info('📲 FCM Token Update Request:');
+    logger.info('   User ID:', req.user._id);
+    logger.info('   User Role:', req.user.role);
+    logger.info('   FCM Token:', fcmToken ? `${fcmToken.substring(0, 20)}...` : 'null');
 
     if (!fcmToken) {
-      console.error('❌ No FCM token provided');
+      logger.error('❌ No FCM token provided');
       return res.status(400).json({
         success: false,
         message: 'FCM token is required',
@@ -467,7 +471,7 @@ exports.updateFcmToken = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (!user) {
-      console.error('❌ User not found:', req.user._id);
+      logger.error('❌ User not found:', req.user._id);
       return res.status(404).json({
         success: false,
         message: 'User not found',
@@ -480,15 +484,16 @@ exports.updateFcmToken = async (req, res) => {
     user.fcmToken = fcmToken;
     await user.save();
 
-    console.log(`✅ FCM token ${tokenChanged ? 'updated' : 'saved'} for user: ${user.phone} (${user.role})`);
-    console.log(`   User name: ${user.name || 'Not set'}`);
+    logger.info(`✅ FCM token ${tokenChanged ? 'updated' : 'saved'} for user: ${user.phone} (${user.role})`);
+    logger.info(`   User name: ${user.name || 'Not set'}`);
+    
 
     res.status(200).json({
       success: true,
       message: 'FCM token updated successfully',
     });
   } catch (error) {
-    console.error('❌ FCM token update error:', error);
+    logger.error('❌ FCM token update error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update FCM token',
@@ -516,14 +521,14 @@ exports.deleteAccount = async (req, res) => {
     user.isActive = false;
     await user.save();
 
-    console.log(`✅ Account deactivated: ${user.phone}`);
+    logger.info(`✅ Account deactivated: ${user.phone}`);
 
     res.status(200).json({
       success: true,
       message: 'Account deactivated successfully',
     });
   } catch (error) {
-    console.error('❌ Account deletion error:', error);
+    logger.error('❌ Account deletion error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete account',

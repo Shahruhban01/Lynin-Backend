@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const User = require('../models/User');
 const Salon = require('../models/Salon');
 const NotificationService = require('./notificationService');
+const logger = require('../utils/logger');
 
 class ReminderService {
   // Check for bookings that need reminders
@@ -22,7 +23,7 @@ class ReminderService {
         .populate('userId', 'name phone fcmToken')
         .populate('salonId', 'name');
 
-      console.log(`📅 Found ${upcomingBookings.length} bookings needing reminders`);
+      logger.info(`📅 Found ${upcomingBookings.length} bookings needing reminders`);
 
       for (const booking of upcomingBookings) {
         if (booking.userId.fcmToken) {
@@ -38,7 +39,7 @@ class ReminderService {
         }
       }
     } catch (error) {
-      console.error('❌ Check reminders error:', error);
+      logger.error('❌ Check reminders error:', error);
     }
   }
 
@@ -54,7 +55,7 @@ class ReminderService {
         .populate('userId', 'name phone fcmToken')
         .populate('salonId', 'name');
 
-      console.log(`🔔 Found ${approachingBookings.length} turns approaching`);
+      logger.info(`🔔 Found ${approachingBookings.length} turns approaching`);
 
       for (const booking of approachingBookings) {
         if (booking.userId.fcmToken && booking.queuePosition === 1) {
@@ -70,7 +71,7 @@ class ReminderService {
         }
       }
     } catch (error) {
-      console.error('❌ Check turn approaching error:', error);
+      logger.error('❌ Check turn approaching error:', error);
     }
   }
 
@@ -82,7 +83,7 @@ class ReminderService {
       this.checkTurnApproaching();
     }, 5 * 60000);
 
-    console.log('⏰ Reminder scheduler started (checks every 5 minutes)');
+    logger.info('⏰ Reminder scheduler started (checks every 5 minutes)');
   }
 }
 

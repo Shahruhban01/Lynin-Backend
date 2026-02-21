@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Staff = require('../models/Staff');
 const Salon = require('../models/Salon');
+const logger = require('../utils/logger');
 
 // @desc    Get daily summary report
 // @route   GET /api/reports/daily-summary
@@ -32,7 +33,7 @@ exports.getDailySummary = async (req, res) => {
     const nextDay = new Date(reportDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
-    console.log(`📊 Daily summary for ${salonId} on ${reportDate.toDateString()}`);
+    logger.info(`📊 Daily summary for ${salonId} on ${reportDate.toDateString()}`);
 
     // Get all bookings for the day
     const bookings = await Booking.find({
@@ -138,7 +139,7 @@ exports.getDailySummary = async (req, res) => {
       hourlyData: activeHours,
     });
   } catch (error) {
-    console.error('❌ Daily summary error:', error);
+    logger.error('❌ Daily summary error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate daily summary',
@@ -175,7 +176,7 @@ exports.getStaffPerformance = async (req, res) => {
     const end = endDate ? new Date(endDate) : new Date();
     end.setHours(23, 59, 59, 999);
 
-    console.log(`📊 Staff performance for ${salonId} from ${start.toDateString()} to ${end.toDateString()}`);
+    logger.info(`📊 Staff performance for ${salonId} from ${start.toDateString()} to ${end.toDateString()}`);
 
     // Get all staff for this salon
     const staff = await Staff.find({ salonId, isActive: true });
@@ -255,7 +256,7 @@ exports.getStaffPerformance = async (req, res) => {
       performance,
     });
   } catch (error) {
-    console.error('❌ Staff performance error:', error);
+    logger.error('❌ Staff performance error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate staff performance report',
@@ -314,7 +315,7 @@ exports.getRevenueReport = async (req, res) => {
         end = new Date();
     }
 
-    console.log(`💰 Revenue report for ${salonId} from ${start.toDateString()} to ${end.toDateString()}`);
+    logger.info(`💰 Revenue report for ${salonId} from ${start.toDateString()} to ${end.toDateString()}`);
 
     // Get completed bookings in range
     const bookings = await Booking.find({
@@ -408,7 +409,7 @@ exports.getRevenueReport = async (req, res) => {
       dailyRevenue,
     });
   } catch (error) {
-    console.error('❌ Revenue report error:', error);
+    logger.error('❌ Revenue report error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate revenue report',
@@ -493,7 +494,7 @@ exports.getDashboardStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Dashboard stats error:', error);
+    logger.error('❌ Dashboard stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch dashboard stats',

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 
 const AdminAuditLog = require('../models/AdminAuditLog');
 
@@ -21,25 +22,25 @@ exports.protect = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('🔐 Token decoded for user:', decoded.userId);
+    logger.info('🔐 Token decoded for user:', decoded.userId);
 
     // Get user from token
     const user = await User.findById(decoded.userId).select('-__v');
 
     if (!user) {
-      console.error('❌ User not found:', decoded.userId);
+      logger.error('❌ User not found:', decoded.userId);
       return res.status(401).json({
         success: false,
         message: 'User not found',
       });
     }
 
-    console.log('✅ User authenticated:', user._id);
-    console.log('✅ Phone Number:', user.phone);
+    logger.info('✅ User authenticated:', user._id);
+    logger.info('✅ Phone Number:', user.phone);
     req.user = user;
     next();
   } catch (error) {
-    console.error('❌ Auth middleware error:', error.message);
+    logger.error('❌ Auth middleware error:', error.message);
     return res.status(401).json({
       success: false,
       message: 'Not authorized, token failed',
@@ -64,7 +65,7 @@ exports.adminOnly = async (req, res, next) => {
 
     // Check if user has admin role
     if (req.user.role !== 'admin') {
-      console.error('❌ Forbidden: User is not admin:', req.user._id);
+      logger.error('❌ Forbidden: User is not admin:', req.user._id);
       
       return res.status(403).json({
         success: false,
@@ -73,10 +74,10 @@ exports.adminOnly = async (req, res, next) => {
       });
     }
 
-    console.log('✅ Admin access granted:', req.user._id);
+    logger.info('✅ Admin access granted:', req.user._id);
     next();
   } catch (error) {
-    console.error('❌ Admin middleware error:', error.message);
+    logger.error('❌ Admin middleware error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Authorization failed',
@@ -112,7 +113,7 @@ exports.logAdminActivity = (actionType, entityType) => {
               userAgent: req.get('user-agent'),
             });
           } catch (err) {
-            console.error('❌ Failed to log admin activity:', err.message);
+            logger.error('❌ Failed to log admin activity:', err.message);
           }
         });
       }

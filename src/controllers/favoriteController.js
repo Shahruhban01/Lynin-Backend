@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Salon = require('../models/Salon');
+const logger = require('../utils/logger');
 
 // @desc    Get user's favorite salons
 // @route   GET /api/favorites
@@ -18,7 +19,7 @@ exports.getFavorites = async (req, res) => {
       favorites: user.favoriteSalons,
     });
   } catch (error) {
-    console.error('❌ Get favorites error:', error);
+    logger.error('❌ Get favorites error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch favorites',
@@ -57,14 +58,14 @@ exports.addFavorite = async (req, res) => {
     user.favoriteSalons.push(salonId);
     await user.save();
 
-    console.log(`✅ Salon ${salonId} added to favorites for user ${userId}`);
+    logger.info(`✅ Salon ${salonId} added to favorites for user ${userId}`);
 
     res.status(200).json({
       success: true,
       message: 'Added to favorites',
     });
   } catch (error) {
-    console.error('❌ Add favorite error:', error);
+    logger.error('❌ Add favorite error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to add favorite',
@@ -89,14 +90,14 @@ exports.removeFavorite = async (req, res) => {
     );
     await user.save();
 
-    console.log(`✅ Salon ${salonId} removed from favorites for user ${userId}`);
+    logger.info(`✅ Salon ${salonId} removed from favorites for user ${userId}`);
 
     res.status(200).json({
       success: true,
       message: 'Removed from favorites',
     });
   } catch (error) {
-    console.error('❌ Remove favorite error:', error);
+    logger.error('❌ Remove favorite error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to remove favorite',
@@ -120,7 +121,7 @@ exports.checkFavorite = async (req, res) => {
       isFavorite,
     });
   } catch (error) {
-    console.error('❌ Check favorite error:', error);
+    logger.error('❌ Check favorite error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to check favorite',
