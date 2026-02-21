@@ -2,297 +2,330 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
+const morgan = require('morgan');
 const { Server } = require('socket.io');
 
 const connectDatabase = require('./config/database');
 const ReminderService = require('./services/reminderService');
+const logger = require('./utils/logger'); // see below
 
-// ===== Route Imports (ALL FIRST) =====
-const authRoutes = require('./routes/authRoutes');
-const salonRoutes = require('./routes/salonRoutes');
-const bookingRoutes = require('./routes/bookingRoutes');
-const reviewRoutes = require('./routes/reviewRoutes');
-const analyticsRoutes = require('./routes/analyticsRoutes');
-const favoriteRoutes = require('./routes/favoriteRoutes');
-const salonSetupRoutes = require('./routes/salonSetupRoutes');
-const queueRoutes = require('./routes/queueRoutes');
-const dashboardRoutes = require('./routes/dashboardRoutes');
-const scheduledBookingRoutes = require('./routes/scheduledBookingRoutes');
-const staffRoutes = require('./routes/staff');
-const reportsRoutes = require('./routes/reports');
-const faqRoutes = require('./routes/faqs');
-const featureFlagRoutes = require('./routes/featureFlags');
-const appInfoRoutes = require('./routes/appInfo');
+// ── Route Imports ────────────────────────────────────────────────────────────
+const authRoutes                = require('./routes/authRoutes');
+const salonRoutes               = require('./routes/salonRoutes');
+const bookingRoutes             = require('./routes/bookingRoutes');
+const reviewRoutes              = require('./routes/reviewRoutes');
+const analyticsRoutes           = require('./routes/analyticsRoutes');
+const favoriteRoutes            = require('./routes/favoriteRoutes');
+const salonSetupRoutes          = require('./routes/salonSetupRoutes');
+const queueRoutes               = require('./routes/queueRoutes');
+const dashboardRoutes           = require('./routes/dashboardRoutes');
+const scheduledBookingRoutes    = require('./routes/scheduledBookingRoutes');
+const staffRoutes               = require('./routes/staff');
+const reportsRoutes             = require('./routes/reports');
+const faqRoutes                 = require('./routes/faqs');
+const featureFlagRoutes         = require('./routes/featureFlags');
+const appInfoRoutes             = require('./routes/appInfo');
+const adminAuthRoutes           = require('./routes/adminAuthRoutes');
+const adminRoutes               = require('./routes/adminRoutes');
 
-// Import admin routes
-const adminAuthRoutes = require('./routes/adminAuthRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-// const adminRoutes = require('./routes/adminRoutes');
-
-
-
-
-// Initialize Express app
-const app = express();
+// ── App & Server Setup ───────────────────────────────────────────────────────
+const app    = express();
 const server = http.createServer(app);
 
-// Initialize Socket.io
+const isProd = process.env.NODE_ENV === 'production';
+
+// ── Socket.io ────────────────────────────────────────────────────────────────
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: isProd
+      ? (process.env.ALLOWED_ORIGINS || '').split(',')
+      : '*',
     methods: ['GET', 'POST'],
   },
+  pingTimeout:  60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling'],
 });
 
-// Connect to MongoDB
+// ── Database & Services ──────────────────────────────────────────────────────
 connectDatabase();
-
-// Start reminder scheduler
 ReminderService.startScheduler();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-// app.use((req, res, next) => {
-//   const authHeader = req.headers.authorization;
+// ── Security Middleware ──────────────────────────────────────────────────────
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
-//   if (authHeader) {
-//     const token = authHeader.split(' ')[1];
-//     console.log('🔐 JWT RECEIVED:', token);
-//   } else {
-//     console.log('❌ No Authorization header');
-//   }
+app.use(cors({
+  origin: isProd
+    ? (process.env.ALLOWED_ORIGINS || '').split(',')
+    : '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
 
-//   next();
-// });
+// Global rate limiter
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: isProd ? 300 : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again later.' },
+}));
 
-app.use(express.urlencoded({ extended: true }));
+// Stricter limiter for auth routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { success: false, message: 'Too many auth attempts, please try again later.' },
+});
 
-// Debug middleware (only in development)
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    if (req.path.includes('/auth/verify-token')) {
-      console.log('🔍 Auth Request:', {
-        method: req.method,
-        hasToken: !!req.body.idToken || !!req.body.firebaseToken,
-        hasPhone: !!req.body.phone,
-      });
-    }
-    next();
-  });
+// ── General Middleware ───────────────────────────────────────────────────────
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  app.use((req, res, next) => {
-    if (req.path.includes('/bookings')) {
-      console.log('🔍 Booking Request:', {
-        method: req.method,
-        path: req.path,
-      });
-    }
-    next();
-  });
-}
+// HTTP request logging
+app.use(morgan(isProd ? 'combined' : 'dev', {
+  stream: { write: (msg) => logger.http(msg.trim()) },
+  skip: (req) => req.path === '/api/health',
+}));
 
-// Make io accessible in routes
+// Trust proxy (needed behind Nginx / load balancers)
+if (isProd) app.set('trust proxy', 1);
+
+// Make io accessible in routes/controllers
 app.set('io', io);
+global.io = io;
 
-// Add this line with other route imports
-// const dashboardRoutes = require('./routes/dashboard');
-
-
-
-// ===== Route Registration =====
-app.use('/api/auth', authRoutes);
-app.use('/api/salons', salonRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/favorites', favoriteRoutes);
-app.use('/api/salon-setup', salonSetupRoutes);
-app.use('/api/queue', queueRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/scheduled-bookings', scheduledBookingRoutes);
-app.use('/api/staff', staffRoutes);
-app.use('/api/reports', reportsRoutes);
-app.use('/api/faqs', faqRoutes);
-app.use('/api/feature-flags', featureFlagRoutes);
-app.use('/api/app-info', appInfoRoutes);
-
-// Register admin routes
-// Register admin routes (order matters!)
-app.use('/api/admin/auth', adminAuthRoutes); // Auth endpoints
-app.use('/api/admin', adminRoutes); // Protected admin endpoints
-// app.use('/api/admin', adminRoutes);
-
-
-
-
-
-
-
-
-
-app.get('/api/test-timeout', async (req, res) => {
-  await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
-  res.json({ message: "Delayed response" });
+// Request ID for tracing
+app.use((req, _res, next) => {
+  req.id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  next();
 });
 
-// Health check route
-app.get('/api/health', (req, res) => {
+// ── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/auth',               authLimiter, authRoutes);
+app.use('/api/salons',             salonRoutes);
+app.use('/api/bookings',           bookingRoutes);
+app.use('/api/reviews',            reviewRoutes);
+app.use('/api/analytics',          analyticsRoutes);
+app.use('/api/favorites',          favoriteRoutes);
+app.use('/api/salon-setup',        salonSetupRoutes);
+app.use('/api/queue',              queueRoutes);
+app.use('/api/dashboard',          dashboardRoutes);
+app.use('/api/scheduled-bookings', scheduledBookingRoutes);
+app.use('/api/staff',              staffRoutes);
+app.use('/api/reports',            reportsRoutes);
+app.use('/api/faqs',               faqRoutes);
+app.use('/api/feature-flags',      featureFlagRoutes);
+app.use('/api/app-info',           appInfoRoutes);
+app.use('/api/admin/auth',         authLimiter, adminAuthRoutes);
+app.use('/api/admin',              adminRoutes);
+
+// ── Health Check ─────────────────────────────────────────────────────────────
+app.get('/api/health', (_req, res) => {
   res.status(200).json({
-    success: true,
-    message: 'Lyn-in Backend API is running',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
+    success:     true,
+    message:     'Lyn-in Backend API is running',
+    timestamp:   new Date().toISOString(),
+    uptime:      Math.floor(process.uptime()),
     environment: process.env.NODE_ENV || 'development',
+    memory: {
+      used:  `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+      total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`,
+    },
   });
 });
 
-// 404 handler
+// ── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found',
+    message: `Route not found: ${req.method} ${req.path}`,
   });
 });
 
-// Error handler
+// ── Global Error Handler ─────────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error('❌ Server Error:', err);
-  res.status(500).json({
+  const status = err.status || err.statusCode || 500;
+
+  logger.error(`[${req.id}] ${err.stack || err.message}`);
+
+  res.status(status).json({
     success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    message: status === 500 ? 'Internal server error' : err.message,
+    ...(isProd ? {} : { stack: err.stack, requestId: req.id }),
   });
 });
 
-// Export io for use in controllers
-global.io = io;
+// ── Socket.io ────────────────────────────────────────────────────────────────
 
-// Socket.io connection handling - UPDATE THIS SECTION
+// Track connected sockets per salon for metrics
+const salonSocketCount = new Map();
+
 io.on('connection', (socket) => {
-  console.log(`🔌 Socket connected: ${socket.id}`);
+  logger.info(`🔌 Socket connected: ${socket.id}`);
 
-  // ✅ AUTHENTICATE SOCKET
+  // Authenticate
   socket.on('authenticate', (data) => {
-    if (data && data.userId) {
+    if (data?.userId) {
       socket.userId = data.userId;
-      console.log(`🔐 Socket authenticated: ${socket.id} → User: ${data.userId}`);
+      logger.info(`🔐 Socket authenticated: ${socket.id} → ${data.userId}`);
       socket.emit('authenticated', { success: true });
     } else {
-      console.warn(`⚠️ Socket authentication failed: ${socket.id}`);
+      logger.warn(`⚠️  Socket auth failed: ${socket.id}`);
       socket.emit('authenticated', { success: false, error: 'Invalid user ID' });
     }
   });
 
-  // User joins their own room (for targeted notifications)
+  // User personal room
   socket.on('join_user_room', (userId) => {
+    if (!userId) return;
     socket.join(`user_${userId}`);
-    console.log(`✅ User ${userId} joined personal room`);
+    logger.info(`✅ User ${userId} joined personal room`);
   });
 
-  // ✅ JOIN SALON ROOM WITH INITIAL WAIT TIME
+  // Salon room + initial wait time
   socket.on('join_salon_room', async (salonId) => {
+    if (!salonId) return;
     socket.join(`salon_${salonId}`);
-    console.log(`✅ Socket ${socket.id} joined salon room: ${salonId}`);
 
-    // Send initial personalized wait time
+    // Track count
+    salonSocketCount.set(salonId,
+      (salonSocketCount.get(salonId) || 0) + 1);
+
+    logger.info(`✅ Socket ${socket.id} joined salon room: ${salonId}`);
+
     try {
-      const Salon = require('./models/Salon');
+      const Salon           = require('./models/Salon');
       const WaitTimeService = require('./services/waitTimeService');
-      
-      const salon = await Salon.findById(salonId);
+
+      const salon = await Salon.findById(salonId).lean();
       if (salon) {
-        const userId = socket.userId || null;
-        const waitTime = await WaitTimeService.calculateWaitTime(salonId, userId, salon);
-        
+        const waitTime = await WaitTimeService.calculateWaitTime(
+          salonId, socket.userId || null, salon
+        );
         socket.emit('wait_time_updated', {
-          salonId: salonId,
-          waitTime: waitTime,
-          timestamp: Date.now()
+          salonId,
+          waitTime,
+          timestamp: Date.now(),
         });
-        
-        console.log(`   ✅ Sent initial wait time to ${socket.id}: ${waitTime.displayText}`);
       }
-    } catch (error) {
-      console.error('Error sending initial wait time:', error);
+    } catch (err) {
+      logger.error(`Error sending initial wait time to ${socket.id}: ${err.message}`);
     }
   });
 
   // Leave salon room
   socket.on('leave_salon_room', (salonId) => {
+    if (!salonId) return;
     socket.leave(`salon_${salonId}`);
-    console.log(`👋 Socket ${socket.id} left salon room: ${salonId}`);
+
+    const count = (salonSocketCount.get(salonId) || 1) - 1;
+    if (count <= 0) salonSocketCount.delete(salonId);
+    else salonSocketCount.set(salonId, count);
+
+    logger.info(`👋 Socket ${socket.id} left salon room: ${salonId}`);
   });
 
-  // Disconnect
-  socket.on('disconnect', () => {
-    console.log(`🔌 Socket disconnected: ${socket.id}`);
+  socket.on('disconnect', (reason) => {
+    logger.info(`🔌 Socket disconnected: ${socket.id} (${reason})`);
+  });
+
+  socket.on('error', (err) => {
+    logger.error(`Socket error [${socket.id}]: ${err.message}`);
   });
 });
 
-// Export io for use in controllers
-global.io = io;
+// ── Wait-Time Auto-Refresh ───────────────────────────────────────────────────
+const REFRESH_INTERVAL_MS = parseInt(process.env.WAIT_TIME_REFRESH_MS || '30000', 10);
 
-// ✅ AUTO-REFRESH WAIT TIMES EVERY 30 SECONDS
-setInterval(async () => {
+const waitTimeRefresher = setInterval(async () => {
   try {
-    const Booking = require('./models/Booking');
+    const Booking              = require('./models/Booking');
     const { emitWaitTimeUpdate } = require('./utils/waitTimeHelpers');
-    
-    // Get all salons with active queues
+
     const activeSalons = await Booking.distinct('salonId', {
-      status: { $in: ['pending', 'in-progress'] }
+      status: { $in: ['pending', 'in-progress'] },
     });
-    
-    if (activeSalons.length > 0) {
-      console.log(`⏰ Auto-refresh: Updating ${activeSalons.length} salons with active queues`);
-      
-      // Broadcast updates for each salon
-      for (const salonId of activeSalons) {
-        await emitWaitTimeUpdate(salonId);
-      }
-    }
-  } catch (error) {
-    console.error('❌ Auto-refresh error:', error);
+
+    if (activeSalons.length === 0) return;
+
+    logger.info(`⏰ Auto-refresh: updating ${activeSalons.length} active salon(s)`);
+
+    await Promise.allSettled(
+      activeSalons.map((salonId) => emitWaitTimeUpdate(salonId))
+    );
+  } catch (err) {
+    logger.error(`Auto-refresh error: ${err.message}`);
   }
-}, 30000); // 30 seconds
+}, REFRESH_INTERVAL_MS);
 
-
-// Start server
-const PORT = process.env.PORT || 3000;
+// ── Start Server ─────────────────────────────────────────────────────────────
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  console.log(`\n${'='.repeat(60)}`);
-  console.log(`🚀 LYN-IN BACKEND SERVER`);
-  console.log(`${'='.repeat(60)}`);
-  console.log(`📍 Server running on:`);
-  console.log(`   - Local:   http://localhost:${PORT}`);
-  console.log(`   - Network: http://${HOST}:${PORT}`);
-  console.log(`\n📱 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔥 Firebase Admin SDK: ✅ Initialized`);
-  console.log(`🔌 Socket.io: ✅ Enabled`);
-  console.log(`💾 MongoDB: ✅ Connected`);
-  console.log(`⏰ Reminder Service: ✅ Running (checks every 5 mins)`);
-  console.log(`🎁 Loyalty Points: ✅ Active (1pt per ₹10)`);
-  console.log(`${'='.repeat(60)}`);
-  console.log(`✅ Ready to accept requests from Flutter apps\n`);
+  const line = '='.repeat(60);
+  logger.info(`\n${line}`);
+  logger.info('🚀  LYN-IN BACKEND SERVER');
+  logger.info(line);
+  logger.info(`📍  Local:       http://localhost:${PORT}`);
+  logger.info(`📍  Network:     http://${HOST}:${PORT}`);
+  logger.info(`📱  Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info('🔥  Firebase Admin SDK : ✅');
+  logger.info('🔌  Socket.io          : ✅');
+  logger.info('💾  MongoDB            : ✅');
+  logger.info('⏰  Reminder Service   : ✅');
+  logger.info('🛡️   Helmet / Rate Limit : ✅');
+  logger.info(`${line}\n`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('\n⚠️  SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    console.log('✅ Server closed');
+// ── Graceful Shutdown ────────────────────────────────────────────────────────
+const shutdown = (signal) => {
+  logger.warn(`\n⚠️  ${signal} received — shutting down gracefully...`);
+
+  clearInterval(waitTimeRefresher);
+
+  server.close(async () => {
+    logger.info('✅ HTTP server closed');
+
+    // Close Socket.io
+    await io.close();
+    logger.info('✅ Socket.io closed');
+
+    // Close MongoDB
+    const mongoose = require('mongoose');
+    await mongoose.connection.close();
+    logger.info('✅ MongoDB connection closed');
+
     process.exit(0);
   });
+
+  // Force kill after 10s if still hanging
+  setTimeout(() => {
+    logger.error('❌ Force shutdown after timeout');
+    process.exit(1);
+  }, 10_000);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
+
+// Catch unhandled promise rejections
+process.on('unhandledRejection', (reason) => {
+  logger.error(`Unhandled Rejection: ${reason}`);
+  if (isProd) shutdown('unhandledRejection');
 });
 
-process.on('SIGINT', () => {
-  console.log('\n⚠️  SIGINT received, shutting down gracefully...');
-  server.close(() => {
-    console.log('✅ Server closed');
-    process.exit(0);
-  });
+// Catch uncaught exceptions
+process.on('uncaughtException', (err) => {
+  logger.error(`Uncaught Exception: ${err.stack}`);
+  shutdown('uncaughtException');
 });
-
