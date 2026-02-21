@@ -6,7 +6,7 @@ const adminAuditLogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
+      // ✅ Removed index: true — covered by compound index below
     },
     adminName: {
       type: String,
@@ -30,18 +30,18 @@ const adminAuditLogSchema = new mongoose.Schema(
         'admin_login',
       ],
       required: true,
-      index: true,
+      // ✅ Removed index: true — covered by compound index below
     },
     entityType: {
       type: String,
       enum: ['user', 'salon', 'booking', 'system'],
       required: true,
-      index: true,
+      // ✅ Removed index: true — covered by compound index below
     },
     entityId: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,
-      index: true,
+      // ✅ Removed index: true — covered by compound index below
     },
     previousState: {
       type: mongoose.Schema.Types.Mixed,
@@ -66,7 +66,7 @@ const adminAuditLogSchema = new mongoose.Schema(
     timestamp: {
       type: Date,
       default: Date.now,
-      index: true,
+      // ✅ Removed index: true — TTL index below already creates this index
     },
   },
   {
@@ -79,7 +79,8 @@ adminAuditLogSchema.index({ adminId: 1, timestamp: -1 });
 adminAuditLogSchema.index({ entityType: 1, entityId: 1, timestamp: -1 });
 adminAuditLogSchema.index({ actionType: 1, timestamp: -1 });
 
-// TTL index - auto-delete logs older than 2 years (compliance retention)
+// TTL index — auto-delete logs older than 2 years (63,072,000 seconds)
+// ✅ This is the ONLY index on timestamp — no duplicate
 adminAuditLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 63072000 });
 
 module.exports = mongoose.model('AdminAuditLog', adminAuditLogSchema);
