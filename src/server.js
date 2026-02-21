@@ -4,7 +4,7 @@ const express    = require('express');
 const cors       = require('cors');
 const http       = require('http');
 const helmet     = require('helmet');
-const rateLimit  = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const compression = require('compression');
 const morgan     = require('morgan');
@@ -143,21 +143,16 @@ const makeRedisStore = (prefix) => new RedisStore({
   prefix,
 });
 
-// ✅ FIXED — guaranteed to never return undefined/IPv6 raw
 const clientIp = (req) => {
-  const raw = (req.headers['x-forwarded-for'] || '')
+  // Prefer x-forwarded-for (set by your reverse proxy/load balancer)
+  const forwarded = (req.headers['x-forwarded-for'] || '')
     .split(',')[0]
-    .trim() || req.ip || '';
+    .trim();
 
-  // Strip IPv4-mapped IPv6 prefix (::ffff:1.2.3.4 → 1.2.3.4)
-  const stripped = raw.replace(/^::ffff:/, '');
-
-  // express-rate-limit v7 rejects bare IPv6 — wrap in brackets if needed
-  if (stripped.includes(':') && !stripped.startsWith('[')) {
-    return `[${stripped}]`;
-  }
-
-  return stripped || '0.0.0.0'; // ← final fallback for mock/test requests
+  // ipKeyGenerator handles IPv4-mapped IPv6, subnetting, all edge cases
+  return forwarded
+    ? ipKeyGenerator(forwarded)
+    : ipKeyGenerator(req.ip);
 };
 
 
