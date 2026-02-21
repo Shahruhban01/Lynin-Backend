@@ -6,7 +6,7 @@ const appInfoSchema = new mongoose.Schema(
     appName: {
       type: String,
       required: true,
-      default: 'Trimzo',
+      default: 'Lynin',
     },
     appDescription: {
       type: String,

@@ -34,7 +34,7 @@ const createFirstAdmin = async () => {
     const admin = await User.create({
       phone: '+919999999999', // ⚠️ CHANGE THIS to your admin phone
       name: 'Super Admin',
-      email: 'admin@trimzo.com', // ⚠️ CHANGE THIS
+      email: 'admin@lynin.in', // ADMIN EMAIL - UPDATE AS NEEDED
       firebaseUid: 'ADMIN_UID_' + Date.now(), // Temporary UID - update with real Firebase UID
       role: 'admin',
       isActive: true,

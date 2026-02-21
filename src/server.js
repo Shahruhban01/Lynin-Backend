@@ -53,18 +53,18 @@ ReminderService.startScheduler();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use((req, res, next) => {
-  const authHeader = req.headers.authorization;
+// app.use((req, res, next) => {
+//   const authHeader = req.headers.authorization;
 
-  if (authHeader) {
-    const token = authHeader.split(' ')[1];
-    console.log('🔐 JWT RECEIVED:', token);
-  } else {
-    console.log('❌ No Authorization header');
-  }
+//   if (authHeader) {
+//     const token = authHeader.split(' ')[1];
+//     console.log('🔐 JWT RECEIVED:', token);
+//   } else {
+//     console.log('❌ No Authorization header');
+//   }
 
-  next();
-});
+//   next();
+// });
 
 app.use(express.urlencoded({ extended: true }));
 
@@ -98,6 +98,8 @@ app.set('io', io);
 // Add this line with other route imports
 // const dashboardRoutes = require('./routes/dashboard');
 
+
+
 // ===== Route Registration =====
 app.use('/api/auth', authRoutes);
 app.use('/api/salons', salonRoutes);
@@ -129,12 +131,16 @@ app.use('/api/admin', adminRoutes); // Protected admin endpoints
 
 
 
+app.get('/api/test-timeout', async (req, res) => {
+  await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
+  res.json({ message: "Delayed response" });
+});
 
 // Health check route
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Trimzo Backend API is running',
+    message: 'Lyn-in Backend API is running',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
@@ -158,34 +164,6 @@ app.use((err, req, res, next) => {
     error: process.env.NODE_ENV === 'development' ? err.message : undefined,
   });
 });
-
-// // Socket.io connection handling
-// io.on('connection', (socket) => {
-//   console.log(`🔌 Socket connected: ${socket.id}`);
-
-//   // User joins their own room (for targeted notifications)
-//   socket.on('join_user_room', (userId) => {
-//     socket.join(`user_${userId}`);
-//     console.log(`✅ User ${userId} joined personal room`);
-//   });
-
-//   // Join salon room (for queue updates)
-//   socket.on('join_salon_room', (salonId) => {
-//     socket.join(`salon_${salonId}`);
-//     console.log(`✅ Joined salon room: ${salonId}`);
-//   });
-
-//   // Leave salon room
-//   socket.on('leave_salon_room', (salonId) => {
-//     socket.leave(`salon_${salonId}`);
-//     console.log(`👋 Left salon room: ${salonId}`);
-//   });
-
-//   // Disconnect
-//   socket.on('disconnect', () => {
-//     console.log(`🔌 Socket disconnected: ${socket.id}`);
-//   });
-// });
 
 // Export io for use in controllers
 global.io = io;
@@ -286,7 +264,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
   console.log(`\n${'='.repeat(60)}`);
-  console.log(`🚀 TRIMZO BACKEND SERVER`);
+  console.log(`🚀 LYN-IN BACKEND SERVER`);
   console.log(`${'='.repeat(60)}`);
   console.log(`📍 Server running on:`);
   console.log(`   - Local:   http://localhost:${PORT}`);
