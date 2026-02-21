@@ -143,8 +143,20 @@ const makeRedisStore = (prefix) => new RedisStore({
   prefix,
 });
 
-const clientIp = (req) =>
-  (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip;
+// // ❌ OLD
+// const clientIp = (req) =>
+//   (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip;
+
+// ✅ NEW — normalize IPv6, strip ::ffff: prefix from IPv4-mapped addresses
+const clientIp = (req) => {
+  const raw = (req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim() || req.ip || '';
+
+  // Strip IPv4-mapped IPv6 prefix (::ffff:1.2.3.4 → 1.2.3.4)
+  return raw.replace(/^::ffff:/, '');
+};
+
 
 const globalLimiter = rateLimit({
   windowMs:        15 * 60 * 1000,
